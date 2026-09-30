@@ -1,0 +1,1 @@
+# SPEC .ntu decentralised registrar
