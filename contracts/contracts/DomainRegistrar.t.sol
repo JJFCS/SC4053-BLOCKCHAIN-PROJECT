@@ -1,4 +1,6 @@
 
+// SPDX-License-Identifier: UNLICENSED
+
 pragma solidity 0.8.34;
 
 import { Test } from "forge-std/Test.sol";
@@ -56,4 +58,121 @@ contract DomainRegistrarTest is Test {
         assertFalse(registrar.isValidLabel("alice-"));
         assertFalse(registrar.isValidLabel("-"));
     }
+
+    function test_ClockStartsAtDeployment() public {
+        uint256 deployedAt = block.timestamp;
+        DomainRegistrar freshRegistrar = new DomainRegistrar();
+
+        assertEq(freshRegistrar.auctionStart() , deployedAt);  // the first argument is the actual and the second is the expected
+        assertEq(freshRegistrar.getCurrentRound() , 1);
+    }
+
+    function test_RoundOneIncludesBothWindows() public {
+        uint256 start = registrar.auctionStart();
+
+        // this basically allows us to control the times in a local environment so i do not have to wait like minutes .. it just means
+        // advance the test clock to exactly 119 seconds after deployment and then check that round 1 has begun
+        vm.warp(start + 119);
+        assertEq(registrar.getCurrentRound(), 1);
+
+        vm.warp(start + 120);
+        assertEq(registrar.getCurrentRound(), 1);
+
+        vm.warp(start + 239);
+        assertEq(registrar.getCurrentRound(), 1);
+    }
+
+    function test_RoundTwoStartsAt240Seconds() public {
+        uint256 start = registrar.auctionStart();
+
+        vm.warp(start + 240);
+
+        assertEq(registrar.getCurrentRound(), 2);
+    }
+
+    function test_ComputesLaterRoundIds() public {
+        uint256 start = registrar.auctionStart();
+
+        vm.warp(start + 480);
+        assertEq(registrar.getCurrentRound(), 3);
+
+        vm.warp(start + 977);
+        assertEq(registrar.getCurrentRound(), 5);
+    }
+
+    function test_ClockOriginStaysFixed() public {
+        uint256 start = registrar.auctionStart();
+
+        vm.warp(start + 600);
+
+        assertEq(registrar.auctionStart(), start);
+    }
+
+    function test_RoundOneDeadlines() public view {
+        uint256 start = registrar.auctionStart();
+        DomainRegistrar.RoundInfo memory info = registrar.getRound(1);
+
+        assertEq(info.startTime, start);
+        assertEq(info.commitEnd, start + 120);
+        assertEq(info.revealEnd, start + 240);
+    }
+
+    function test_StartsInCommitPhase() public view {
+        assertTrue(
+            registrar.getRound(1).phase == DomainRegistrar.Phase.Commit
+        );
+    }
+
+    function test_CommitEndsAt120Seconds() public {
+        uint256 start = registrar.auctionStart();
+
+        vm.warp(start + 119);
+        assertTrue(registrar.getRound(1).phase == DomainRegistrar.Phase.Commit);
+
+        vm.warp(start + 120);
+        assertTrue(registrar.getRound(1).phase == DomainRegistrar.Phase.Reveal);
+    }
+
+    function test_RevealEndsAt240Seconds() public {
+        uint256 start = registrar.auctionStart();
+
+        vm.warp(start + 239);
+        assertTrue(registrar.getRound(1).phase == DomainRegistrar.Phase.Reveal);
+
+        vm.warp(start + 240);
+        assertTrue(registrar.getRound(1).phase == DomainRegistrar.Phase.Ended);
+    }
+
+    function test_RoundTwoFollowsItsOwnSchedule() public {
+        uint256 start = registrar.auctionStart();
+
+        assertTrue(registrar.getRound(2).phase == DomainRegistrar.Phase.NotStarted);
+
+        vm.warp(start + 239);
+        assertTrue(registrar.getRound(2).phase == DomainRegistrar.Phase.NotStarted);
+
+        vm.warp(start + 240);
+        assertTrue(registrar.getRound(2).phase == DomainRegistrar.Phase.Commit);
+
+        vm.warp(start + 360);
+        assertTrue(registrar.getRound(2).phase == DomainRegistrar.Phase.Reveal);
+
+        vm.warp(start + 480);
+        assertTrue(registrar.getRound(2).phase == DomainRegistrar.Phase.Ended);
+    }
+
+    function test_LaterRoundDeadlines() public view {
+        uint256 start = registrar.auctionStart();
+        DomainRegistrar.RoundInfo memory info = registrar.getRound(3);
+
+        assertEq(info.startTime, start + 480);
+        assertEq(info.commitEnd, start + 600);
+        assertEq(info.revealEnd, start + 720);
+    }
+
+    function test_RejectsRoundZero() public {
+        vm.expectRevert(bytes("INVALID ROUND"));
+        registrar.getRound(0);
+    }
+
 }

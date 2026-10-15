@@ -1,4 +1,7 @@
 
+
+// SPDX-License-Identifier: UNLICENSED
+
 // COMMENTARY
 // - note that a smart contract groups functions and data and when it is deployed it will live at an ETH address
 // - note that hardhat compiles and tests that program
@@ -7,7 +10,56 @@
 pragma solidity 0.8.34;
 
 contract DomainRegistrar {
-    uint256 public constant MAX_LABEL_BYTES = 32;  // an unsigned integer of 256 bit integer type with the name MAX_LABEL_BYTES and a value of 32
+
+    enum Phase {
+        NotStarted,
+        Commit,
+        Reveal,
+        Ended
+    }
+
+    struct RoundInfo {
+        // this is our record type containing 3 timestamps and one phase
+        uint256 startTime;
+        uint256 commitEnd;
+        uint256 revealEnd;
+        Phase   phase;
+    }
+
+    uint256 public constant  MAX_LABEL_BYTES = 32;  // an unsigned integer of 256 bit integer type with the name MAX_LABEL_BYTES and a value of 32
+    uint256 public constant  COMMIT_DURATION = 120 seconds;
+    uint256 public constant  REVEAL_DURATION = 120 seconds;
+    uint256 public constant  ROUNDS_DURATION = COMMIT_DURATION + REVEAL_DURATION;
+    uint256 public immutable auctionStart;
+
+    constructor() {
+        auctionStart = block.timestamp;
+    }
+
+    function getCurrentRound() public view returns (uint256) {
+        uint256 elapsed = block.timestamp - auctionStart;
+        return (elapsed / ROUNDS_DURATION) + 1;  // ofc when you divide by integers it drops the fractional part so we need to add 1 to get the round
+    }
+
+    function getRound(uint256 roundId) public view returns (RoundInfo memory info) {
+        require(roundId > 0 , "INVALID ROUND");
+
+        info.startTime = auctionStart + (roundId - 1) * ROUNDS_DURATION;
+        info.commitEnd = info.startTime + COMMIT_DURATION;
+        info.revealEnd = info.commitEnd + REVEAL_DURATION;
+
+        if (block.timestamp < info.startTime) {
+            info.phase = Phase.NotStarted;
+        } else if (block.timestamp < info.commitEnd) {
+            info.phase = Phase.Commit;
+        } else if (block.timestamp < info.revealEnd) {
+            info.phase = Phase.Reveal;
+        } else {
+            info.phase = Phase.Ended;
+        }
+
+        return info;
+    }
 
     function isValidLabel(string memory label) public pure returns (bool) {  // e.g. isValidLabel("James") gives the function the text "James" under the input name `label`
         bytes memory characters = bytes(label);
