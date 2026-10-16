@@ -29,12 +29,19 @@ contract DomainRegistrar {
     struct CommitmentInfo {
         address bidder;
         bytes32 digest;  // this is the commitment hash
-        bytes32 labelHash;
-        uint256 bidWei;
         uint256 roundId;
         uint256 deposit;
         bool    revealed;
         bool    valid;
+        bytes32 labelHash;
+        uint256 bidWei;
+    }
+
+    struct AuctionInfo {
+        uint256 roundId;
+        uint256 winningCommitmentId;  // this is tracking which bid is currently in the lead
+        address highestBidder;
+        uint256 highestBidWei;
     }
 
     uint256 public constant  MAX_LABEL_BYTES = 32;  // an unsigned integer of 256 bit integer type with the name MAX_LABEL_BYTES and a value of 32
@@ -48,7 +55,8 @@ contract DomainRegistrar {
     uint256 public totalLockedDeposits;
 
     mapping(uint256 => CommitmentInfo) private _commitments;
-    mapping(bytes32 => bool) private _usedCommitments;
+    mapping(bytes32 => bool)           private _usedCommitments;
+    mapping(bytes32 => AuctionInfo)    private _auctions;
 
     event CommitmentSubmitted(
         uint256 indexed commitmentId,
@@ -60,9 +68,9 @@ contract DomainRegistrar {
     event CommitmentRevealed(
         uint256 indexed commitmentId,
         uint256 indexed roundId,
-        uint256         bidWei,
         address indexed bidder,
         string          label,
+        uint256         bidWei,
         bool            valid
     );
 
@@ -115,12 +123,38 @@ contract DomainRegistrar {
         info.labelHash = keccak256(bytes(label));
         info.bidWei    = bidWei;
 
-        valid = isValidLabel(label) && bidWei > 0 && bidWei <= info.deposit;
+        AuctionInfo storage auction = _auctions[info.labelHash];
+
+        valid = isValidLabel(label) && bidWei > 0 && bidWei <= info.deposit &&
+            (auction.roundId == 0 || auction.roundId == info.roundId);
         info.valid = valid;
 
-        emit CommitmentRevealed(commitmentId, info.roundId, bidWei , info.bidder , label , valid);
+        if (valid) {
+            if (auction.roundId == 0) {
+                auction.roundId = info.roundId;
+            }
+
+            // so this checks the first bid , the higher bidder , and also if there is
+            // an earlier bid but with a earlier commitment ID
+            bool becomesLeader = auction.winningCommitmentId == 0 || bidWei > auction.highestBidWei ||
+                (bidWei == auction.highestBidWei && commitmentId < auction.winningCommitmentId);
+
+            if (becomesLeader) {
+                auction.winningCommitmentId = commitmentId;
+                auction.highestBidder = info.bidder;
+                auction.highestBidWei = bidWei;
+            }
+        }
+
+        emit CommitmentRevealed(commitmentId , info.roundId , info.bidder , label , bidWei , valid);
 
         return valid;
+    }
+
+    function getAuction(string memory label) public view returns (AuctionInfo memory) {
+        // so we can eventually call something like getAuction("alice") to display our leading bid
+        // note that an unknown name returns a record containing zero values
+        return _auctions[keccak256(bytes(label))];
     }
 
     function getCommitment(uint256 commitmentId) public view returns (CommitmentInfo memory) {
