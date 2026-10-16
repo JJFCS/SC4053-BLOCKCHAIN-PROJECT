@@ -29,8 +29,12 @@ contract DomainRegistrar {
     struct CommitmentInfo {
         address bidder;
         bytes32 digest;  // this is the commitment hash
+        bytes32 labelHash;
+        uint256 bidWei;
         uint256 roundId;
         uint256 deposit;
+        bool    revealed;
+        bool    valid;
     }
 
     uint256 public constant  MAX_LABEL_BYTES = 32;  // an unsigned integer of 256 bit integer type with the name MAX_LABEL_BYTES and a value of 32
@@ -51,6 +55,15 @@ contract DomainRegistrar {
         uint256 indexed roundId,
         address indexed bidder,
         bytes32 digest
+    );
+
+    event CommitmentRevealed(
+        uint256 indexed commitmentId,
+        uint256 indexed roundId,
+        uint256         bidWei,
+        address indexed bidder,
+        string          label,
+        bool            valid
     );
 
     constructor() {
@@ -83,6 +96,31 @@ contract DomainRegistrar {
         emit CommitmentSubmitted(commitmentId, roundId, msg.sender, digest);
 
         return commitmentId;
+    }
+
+    function reveal(uint256 commitmentId , string memory label , uint256 bidWei , bytes32 salt) external returns (bool valid) {
+        require(commitmentId > 0 && commitmentId <= commitmentCount , "INVALID COMMITMENT");
+
+        CommitmentInfo storage info = _commitments[commitmentId];
+
+        require(msg.sender == info.bidder, "NOT BIDDER");  // continue only if this condition is true --> this goes for all require
+        require(!info.revealed, "ALREADY REVEALED");
+        require(getRound(info.roundId).phase == Phase.Reveal, "NOT REVEAL PHASE");
+        require(
+            computeCommitment(info.roundId, info.bidder, label, bidWei, salt)  == info.digest,
+            "COMMITMENT MISMATCH"
+        );
+
+        info.revealed  = true;
+        info.labelHash = keccak256(bytes(label));
+        info.bidWei    = bidWei;
+
+        valid = isValidLabel(label) && bidWei > 0 && bidWei <= info.deposit;
+        info.valid = valid;
+
+        emit CommitmentRevealed(commitmentId, info.roundId, bidWei , info.bidder , label , valid);
+
+        return valid;
     }
 
     function getCommitment(uint256 commitmentId) public view returns (CommitmentInfo memory) {
