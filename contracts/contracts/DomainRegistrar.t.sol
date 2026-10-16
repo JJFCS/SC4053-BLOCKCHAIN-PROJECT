@@ -175,4 +175,70 @@ contract DomainRegistrarTest is Test {
         registrar.getRound(0);
     }
 
+    function test_CommitmentChangesWhenBidDetailsChange() public view {
+        bytes32 salt = bytes32(uint256(123));
+        bytes32 original = registrar.computeCommitment(1 , address(1) , "alice" , 0.004 ether , salt);
+
+        // this changes only the round
+        assertNotEq(
+            original,
+            registrar.computeCommitment(2 , address(1) , "alice" , 0.004 ether , salt)
+        );
+
+        // this changes only the bidder
+        assertNotEq(
+            original,
+            registrar.computeCommitment(1 , address(2) , "alice" , 0.004 ether , salt)
+        );
+
+        // this changes only the name
+        assertNotEq(
+            original,
+            registrar.computeCommitment(1 , address(1) , "bob" ,   0.004 ether , salt)
+        );
+
+        // this changes only the bid amount
+        assertNotEq(
+            original,
+            registrar.computeCommitment(1 , address(1) , "alice" , 0.005 ether , salt)
+        );
+
+        // this changes only the salt
+        assertNotEq(
+            original,
+            registrar.computeCommitment(1 , address(1) , "alice" , 0.004 ether , bytes32(uint256(456)))
+        );
+    }
+
+    function test_CommitmentStaysTheSameAsTimePasses() public {
+        bytes32 salt = bytes32(uint256(123));
+        bytes32 original = registrar.computeCommitment(1, address(1), "alice", 0.004 ether, salt);
+
+        vm.warp(registrar.auctionStart() + 240);
+        bytes32 later = registrar.computeCommitment(1, address(1), "alice", 0.004 ether, salt);
+        assertEq(original, later);
+    }
+
+    function test_CommitmentChangesForAnotherRegistrar() public {
+        DomainRegistrar otherRegistrar = new DomainRegistrar();
+        bytes32 salt   = bytes32(uint256(123));
+        bytes32 first  = registrar.computeCommitment(1, address(1), "alice", 0.004 ether, salt);
+        bytes32 second = otherRegistrar.computeCommitment(1, address(1), "alice", 0.004 ether, salt);
+        assertNotEq(first, second);
+    }
+
+    function test_CommitmentChangesForAnotherChain() public {
+        uint256 originalChainId = block.chainid;
+        bytes32 salt = bytes32(uint256(123));
+        bytes32 original   = registrar.computeCommitment(1, address(1), "alice", 0.004 ether, salt);
+
+        vm.chainId(originalChainId + 1);  // this one is a testing tool that changes block.chainid in the testing env
+
+        bytes32 otherChain = registrar.computeCommitment(1, address(1), "alice", 0.004 ether, salt);
+
+        vm.chainId(originalChainId);
+
+        assertNotEq(original, otherChain);
+    }
+
 }

@@ -26,14 +26,68 @@ contract DomainRegistrar {
         Phase   phase;
     }
 
+    struct CommitmentInfo {
+        address bidder;
+        bytes32 digest;  // this is the commitment hash
+        uint256 roundId;
+        uint256 deposit;
+    }
+
     uint256 public constant  MAX_LABEL_BYTES = 32;  // an unsigned integer of 256 bit integer type with the name MAX_LABEL_BYTES and a value of 32
     uint256 public constant  COMMIT_DURATION = 120 seconds;
     uint256 public constant  REVEAL_DURATION = 120 seconds;
     uint256 public constant  ROUNDS_DURATION = COMMIT_DURATION + REVEAL_DURATION;
     uint256 public immutable auctionStart;
 
+    uint256 public constant COMMIT_DEPOSIT = 0.01 ether;
+    uint256 public commitmentCount;
+    uint256 public totalLockedDeposits;
+
+    mapping(uint256 => CommitmentInfo) private _commitments;
+    mapping(bytes32 => bool) private _usedCommitments;
+
+    event CommitmentSubmitted(
+        uint256 indexed commitmentId,
+        uint256 indexed roundId,
+        address indexed bidder,
+        bytes32 digest
+    );
+
     constructor() {
         auctionStart = block.timestamp;
+    }
+
+    function commit(uint256 roundId , bytes32 digest) external payable returns (uint256 commitmentId) {
+        require(roundId == getCurrentRound(), "WRONG ROUND");
+        require(getRound(roundId).phase == Phase.Commit, "NOT COMMIT PHASE");
+        require(msg.value == COMMIT_DEPOSIT, "INCORRECT DEPOSIT");
+        require(digest != bytes32(0), "EMPTY COMMITMENT");
+
+        bytes32 duplicateKey = keccak256(abi.encode(roundId, msg.sender, digest));
+
+        require(!_usedCommitments[duplicateKey], "DUPLICATE COMMITMENT");
+
+        _usedCommitments[duplicateKey] = true;
+
+        commitmentCount += 1;
+        commitmentId = commitmentCount;
+
+        CommitmentInfo storage info = _commitments[commitmentId];
+        info.bidder  = msg.sender;
+        info.digest  = digest;
+        info.roundId = roundId;
+        info.deposit = msg.value;
+
+        totalLockedDeposits += msg.value;
+
+        emit CommitmentSubmitted(commitmentId, roundId, msg.sender, digest);
+
+        return commitmentId;
+    }
+
+    function getCommitment(uint256 commitmentId) public view returns (CommitmentInfo memory) {
+        require(commitmentId > 0 && commitmentId <= commitmentCount, "INVALID COMMITMENT");
+        return _commitments[commitmentId];
     }
 
     function getCurrentRound() public view returns (uint256) {
@@ -60,6 +114,14 @@ contract DomainRegistrar {
 
         return info;
     }
+
+    function computeCommitment(uint256 roundId , address bidder , string memory label , uint256 bidWei , bytes32 salt) public view returns (bytes32) {
+        // the salt is our secret value that will add randomness so harder to guess the name and bid from the hash
+        // we include the blockchain and registrar address to make this commitend specific to that deployment
+            return keccak256(
+                abi.encode(block.chainid , address(this) , roundId , bidder , label , bidWei , salt)
+            );
+        }
 
     function isValidLabel(string memory label) public pure returns (bool) {  // e.g. isValidLabel("James") gives the function the text "James" under the input name `label`
         bytes memory characters = bytes(label);
