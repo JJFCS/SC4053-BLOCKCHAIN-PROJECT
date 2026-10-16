@@ -41,4 +41,18 @@ describe("DomainRegistrar commitment", function () {
 
         expect(javascriptHash).to.equal(solidityHash);
     });
+
+    it("emits a receipt for an accepted commitment", async function () {
+        const registrar = await ethers.deployContract("DomainRegistrar");
+        await registrar.waitForDeployment();
+
+        const [bidder] = await ethers.getSigners();
+        const digest   = ethers.id("example commitment");
+        const deposit  = await registrar.COMMIT_DEPOSIT();
+
+        await expect(registrar.commit(1n, digest, { value: deposit }))
+            .to.emit(registrar, "CommitmentSubmitted")
+            .withArgs(1n, 1n, bidder.address, digest);
+    });
+
 });
