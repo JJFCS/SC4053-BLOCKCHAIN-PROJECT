@@ -61,6 +61,14 @@ contract DomainRegistrar {
         return info;
     }
 
+    function computeCommitment(uint256 roundId , address bidder , string memory label , uint256 bidWei , bytes32 salt) public view returns (bytes32) {
+        // the salt is our secret value that will add randomness so harder to guess the name and bid from the hash
+        // we include the blockchain and registrar address to make this commitend specific to that deployment
+            return keccak256(
+                abi.encode(block.chainid , address(this) , roundId , bidder , label , bidWei , salt)
+            );
+        }
+
     function isValidLabel(string memory label) public pure returns (bool) {  // e.g. isValidLabel("James") gives the function the text "James" under the input name `label`
         bytes memory characters = bytes(label);
         uint256 length = characters.length;
