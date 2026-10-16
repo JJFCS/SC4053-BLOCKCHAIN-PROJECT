@@ -227,4 +227,18 @@ contract DomainRegistrarTest is Test {
         assertNotEq(first, second);
     }
 
+    function test_CommitmentChangesForAnotherChain() public {
+        uint256 originalChainId = block.chainid;
+        bytes32 salt = bytes32(uint256(123));
+        bytes32 original   = registrar.computeCommitment(1, address(1), "alice", 0.004 ether, salt);
+
+        vm.chainId(originalChainId + 1);  // this one is a testing tool that changes block.chainid in the testing env
+
+        bytes32 otherChain = registrar.computeCommitment(1, address(1), "alice", 0.004 ether, salt);
+
+        vm.chainId(originalChainId);
+
+        assertNotEq(original, otherChain);
+    }
+
 }
