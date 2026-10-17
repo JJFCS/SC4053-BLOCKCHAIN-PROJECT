@@ -171,3 +171,62 @@ describe("DomainRegistrar ownership", function () {
         expect(domain.priceWei).to.equal(bidWei);
     });
 });
+
+describe("DomainRegistrar settlement", function () {
+    it("credits the bidder when another wallet settles the commitment", async function () {
+        const [treasury, bidder, settler] = await ethers.getSigners();
+
+        const registrar = await ethers.deployContract("DomainRegistrar");
+        await registrar.waitForDeployment();
+
+        const roundId = 1n;
+        const commitmentId = 1n;
+        const label = "alice";
+        const bidWei = ethers.parseEther("0.006");
+        const salt = ethers.id("test-only-settlement-salt");
+        const deposit = await registrar.COMMIT_DEPOSIT();
+        const refundWei = deposit - bidWei;
+
+        expect(await registrar.treasury()).to.equal(treasury.address);
+
+        const digest = await registrar.computeCommitment(
+            roundId,
+            bidder.address,
+            label,
+            bidWei,
+            salt
+        );
+
+        const commitTransaction = await registrar.connect(bidder).commit(
+            roundId,
+            digest,
+            { value: deposit }
+        );
+        await commitTransaction.wait();
+
+        const round = await registrar.getRound(roundId);
+        await networkHelpers.time.increaseTo(round.commitEnd);
+
+        const revealTransaction = await registrar.connect(bidder).reveal(
+            commitmentId,
+            label,
+            bidWei,
+            salt
+        );
+        await revealTransaction.wait();
+        await networkHelpers.time.increaseTo(round.revealEnd);
+        await expect(registrar.connect(settler).settleCommit(commitmentId))
+            .to.emit(registrar, "CommitmentSettled")
+            .withArgs(commitmentId,roundId,bidder.address,refundWei,bidWei);
+
+        expect(await registrar.refundCredits(bidder.address)).to.equal(refundWei);
+        expect(await registrar.refundCredits(settler.address)).to.equal(0n);
+        expect(await registrar.totalRefundCredits()).to.equal(refundWei);
+        expect(await registrar.treasuryCredit()).to.equal(bidWei);
+        expect(await registrar.totalLockedDeposits()).to.equal(0n);
+
+        const commitment = await registrar.getCommitment(commitmentId);
+        expect(commitment.settled).to.equal(true);
+        expect(await ethers.provider.getBalance(await registrar.getAddress())).to.equal(deposit);
+    });
+});

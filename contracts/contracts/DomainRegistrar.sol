@@ -35,6 +35,7 @@ contract DomainRegistrar {
         bool    valid;
         bytes32 labelHash;
         uint256 bidWei;
+        bool    settled;
     }
 
     struct AuctionInfo {
@@ -61,10 +62,15 @@ contract DomainRegistrar {
     uint256 public commitmentCount;
     uint256 public totalLockedDeposits;
 
+    address public immutable treasury;
+    uint256 public totalRefundCredits;
+    uint256 public treasuryCredit;
+
     mapping(uint256 => CommitmentInfo) private _commitments;
     mapping(bytes32 => bool)           private _usedCommitments;
     mapping(bytes32 => AuctionInfo)    private _auctions;
     mapping(bytes32 => DomainInfo)     private _domains;
+    mapping(address => uint256)        public refundCredits;
 
     event CommitmentSubmitted(
         uint256 indexed commitmentId,
@@ -91,8 +97,17 @@ contract DomainRegistrar {
         uint256         priceWei
     );
 
+    event CommitmentSettled(
+        uint256 indexed commitmentId,
+        uint256 indexed roundId,
+        address indexed bidder,
+        uint256         refundWei,
+        uint256         proceedsWei
+    );
+
     constructor() {
         auctionStart = block.timestamp;
+        treasury = msg.sender;
     }
 
     function commit(uint256 roundId , bytes32 digest) external payable returns (uint256 commitmentId) {
@@ -166,6 +181,44 @@ contract DomainRegistrar {
         emit CommitmentRevealed(commitmentId , info.roundId , info.bidder , label , bidWei , valid);
 
         return valid;
+    }
+
+
+
+
+
+
+    function settleCommit(uint256 commitmentId) external returns (uint256 refundWei, uint256 proceedsWei) {
+        require(commitmentId > 0 && commitmentId <= commitmentCount,"INVALID COMMITMENT");
+        CommitmentInfo storage info = _commitments[commitmentId];
+
+        require(!info.settled, "ALREADY SETTLED");
+        require(getRound(info.roundId).phase == Phase.Ended,"ROUND NOT ENDED");
+
+        if (!info.revealed) {
+            proceedsWei = info.deposit;
+        } else if (!info.valid) {
+            refundWei   = info.deposit;
+        } else {
+            AuctionInfo storage auction = _auctions[info.labelHash];
+            if (auction.winningCommitmentId == commitmentId) {
+                proceedsWei = info.bidWei;
+                refundWei   = info.deposit - info.bidWei;
+            } else {
+                refundWei   = info.deposit;
+            }
+        }
+
+        info.settled = true;
+
+        totalLockedDeposits -= info.deposit;
+        refundCredits[info.bidder] += refundWei;
+        totalRefundCredits += refundWei;
+        treasuryCredit += proceedsWei;
+
+        emit CommitmentSettled(commitmentId,info.roundId,info.bidder,refundWei,proceedsWei);
+
+        return (refundWei, proceedsWei);
     }
 
     function finalizeName(string memory label) external returns (address owner) {
