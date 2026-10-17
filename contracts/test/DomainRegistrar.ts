@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { describe , it } from "mocha";
 import { network } from "hardhat";
 
-const { ethers } = await network.create();
+const { ethers , networkHelpers } = await network.create();
 
 describe("DomainRegistrar commitment", function () {
 
@@ -55,4 +55,50 @@ describe("DomainRegistrar commitment", function () {
             .withArgs(1n, 1n, bidder.address, digest);
     });
 
+});
+
+
+describe("DomainRegistrar reveal", function () {
+    it("emits the revealed details and exposes the leading bid", async function () {
+        const registrar = await ethers.deployContract("DomainRegistrar");
+        await registrar.waitForDeployment();
+
+        const [bidder] = await ethers.getSigners();
+
+        const roundId = 1n;
+        const commitmentId = 1n;
+        const label = "alice";
+        const bidWei = ethers.parseEther("0.004");
+        const salt = ethers.id("test-only-reveal-salt");
+        const deposit = await registrar.COMMIT_DEPOSIT();
+
+        const digest = await registrar.computeCommitment(
+            roundId,
+            bidder.address,
+            label,
+            bidWei,
+            salt
+        );
+
+        const commitTransaction = await registrar.commit(roundId,digest,
+            { value: deposit }
+        );
+        await commitTransaction.wait();
+
+        const round = await registrar.getRound(roundId);
+        await networkHelpers.time.increaseTo(round.commitEnd);
+
+        await expect(
+            registrar.reveal(commitmentId, label, bidWei, salt)
+        )
+            .to.emit(registrar, "CommitmentRevealed")
+            .withArgs(commitmentId,roundId,bidder.address,label,bidWei,true);
+
+        const auction = await registrar.getAuction(label);
+
+        expect(auction.roundId).to.equal(roundId);
+        expect(auction.winningCommitmentId).to.equal(commitmentId);
+        expect(auction.highestBidder).to.equal(bidder.address);
+        expect(auction.highestBidWei).to.equal(bidWei);
+    });
 });
