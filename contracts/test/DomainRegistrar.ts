@@ -102,3 +102,72 @@ describe("DomainRegistrar reveal", function () {
         expect(auction.highestBidWei).to.equal(bidWei);
     });
 });
+
+
+describe("DomainRegistrar ownership", function () {
+    it("finalizes for the winner and exposes the owner to ethers", async function () {
+        const registrar = await ethers.deployContract("DomainRegistrar");
+        await registrar.waitForDeployment();
+
+        const [bidder, finalizer] = await ethers.getSigners();
+
+        const roundId = 1n;
+        const commitmentId = 1n;
+        const label = "alice";
+        const bidWei = ethers.parseEther("0.004");
+        const salt = ethers.id("test-only-ownership-salt");
+        const deposit = await registrar.COMMIT_DEPOSIT();
+
+        const digest = await registrar.computeCommitment(
+            roundId,
+            bidder.address,
+            label,
+            bidWei,
+            salt
+        );
+
+        const commitTransaction = await registrar.connect(bidder).commit(
+            roundId,
+            digest,
+            { value: deposit }
+        );
+        await commitTransaction.wait();
+
+        const round = await registrar.getRound(roundId);
+        await networkHelpers.time.increaseTo(round.commitEnd);
+
+        const revealTransaction = await registrar.connect(bidder).reveal(
+            commitmentId,
+            label,
+            bidWei,
+            salt
+        );
+        await revealTransaction.wait();
+
+        expect(await registrar.resolve(label)).to.equal(
+            ethers.ZeroAddress
+        );
+
+        await networkHelpers.time.increaseTo(round.revealEnd);
+
+        await expect(registrar.connect(finalizer).finalizeName(label))
+            .to.emit(registrar, "DomainFinalized")
+            .withArgs(
+                ethers.keccak256(ethers.toUtf8Bytes(label)),
+                roundId,
+                bidder.address,
+                label,
+                commitmentId,
+                bidWei
+            );
+
+        expect(await registrar.resolve(label)).to.equal(bidder.address);
+
+        const domain = await registrar.getDomain(label);
+
+        expect(domain.owner).to.equal(bidder.address);
+        expect(domain.roundId).to.equal(roundId);
+        expect(domain.winningCommitmentId).to.equal(commitmentId);
+        expect(domain.priceWei).to.equal(bidWei);
+    });
+});
