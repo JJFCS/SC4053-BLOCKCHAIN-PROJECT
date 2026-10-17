@@ -44,6 +44,13 @@ contract DomainRegistrar {
         uint256 highestBidWei;
     }
 
+    struct DomainInfo {
+        address owner;
+        uint256 roundId;
+        uint256 winningCommitmentId;
+        uint256 priceWei;
+    }
+
     uint256 public constant  MAX_LABEL_BYTES = 32;  // an unsigned integer of 256 bit integer type with the name MAX_LABEL_BYTES and a value of 32
     uint256 public constant  COMMIT_DURATION = 120 seconds;
     uint256 public constant  REVEAL_DURATION = 120 seconds;
@@ -57,6 +64,7 @@ contract DomainRegistrar {
     mapping(uint256 => CommitmentInfo) private _commitments;
     mapping(bytes32 => bool)           private _usedCommitments;
     mapping(bytes32 => AuctionInfo)    private _auctions;
+    mapping(bytes32 => DomainInfo)     private _domains;
 
     event CommitmentSubmitted(
         uint256 indexed commitmentId,
@@ -72,6 +80,15 @@ contract DomainRegistrar {
         string          label,
         uint256         bidWei,
         bool            valid
+    );
+
+    event DomainFinalized(
+        bytes32 indexed labelHash,
+        uint256 indexed roundId,
+        address indexed owner,
+        string          label,
+        uint256         winningCommitmentId,
+        uint256         priceWei
     );
 
     constructor() {
@@ -149,6 +166,46 @@ contract DomainRegistrar {
         emit CommitmentRevealed(commitmentId , info.roundId , info.bidder , label , bidWei , valid);
 
         return valid;
+    }
+
+    function finalizeName(string memory label) external returns (address owner) {
+        require(isValidLabel(label), "INVALID LABEL");
+
+        bytes32 labelHash = keccak256(bytes(label));
+        AuctionInfo storage auction = _auctions[labelHash];
+
+        require(auction.winningCommitmentId != 0,"NO WINNING BID");
+        require(getRound(auction.roundId).phase == Phase.Ended,"ROUND NOT ENDED");
+
+        DomainInfo storage domain = _domains[labelHash];
+
+        require(domain.owner == address(0), "ALREADY FINALIZED");
+
+        owner = auction.highestBidder;  // this will use the winning bidder regardless of who calls the finalizeName()
+
+        domain.owner = owner;
+        domain.roundId = auction.roundId;
+        domain.winningCommitmentId = auction.winningCommitmentId;
+        domain.priceWei = auction.highestBidWei;
+
+        emit DomainFinalized(
+            labelHash,
+            domain.roundId,
+            owner,
+            label,
+            domain.winningCommitmentId,
+            domain.priceWei
+        );
+
+        return owner;
+    }
+
+    function getDomain(string memory label) public view returns (DomainInfo memory) {
+        return _domains[keccak256(bytes(label))];
+    }
+
+    function resolve(string memory label) public view returns (address) {
+        return _domains[keccak256(bytes(label))].owner;
     }
 
     function getAuction(string memory label) public view returns (AuctionInfo memory) {
