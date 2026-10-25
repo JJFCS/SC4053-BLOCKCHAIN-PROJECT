@@ -65,6 +65,7 @@ contract DomainRegistrar {
     address public immutable treasury;
     uint256 public totalRefundCredits;
     uint256 public treasuryCredit;
+    bool private _withdrawing;
 
     mapping(uint256 => CommitmentInfo) private _commitments;
     mapping(bytes32 => bool)           private _usedCommitments;
@@ -105,10 +106,27 @@ contract DomainRegistrar {
         uint256         proceedsWei
     );
 
+	event RefundWithdrawn(
+		address indexed bidder,
+		uint256 amountWei
+	);
+
+	event TreasuryWithdrawn(
+		address indexed recipient,
+		uint256 amountWei
+	);
+
     constructor() {
         auctionStart = block.timestamp;
         treasury = msg.sender;
     }
+
+	modifier nonReentrant() {
+		require(!_withdrawing, "REENTRANT WITHDRAWAL");
+		_withdrawing = true;
+		_;  // we are running the function's body here
+		_withdrawing = false;
+	}
 
     function commit(uint256 roundId , bytes32 digest) external payable returns (uint256 commitmentId) {
         require(roundId == getCurrentRound(), "WRONG ROUND");
@@ -183,10 +201,32 @@ contract DomainRegistrar {
         return valid;
     }
 
+    function withdrawRefund() external nonReentrant returns (uint256 amount) {
+        amount = refundCredits[msg.sender];
+        require(amount > 0, "NO REFUND");
 
+        refundCredits[msg.sender] = 0;
+        totalRefundCredits -= amount;
 
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
 
+        require(success, "ETH TRANSFER FAILED");
+        emit RefundWithdrawn(msg.sender, amount);
+        return amount;
+    }
 
+    function withdrawTreasury() external nonReentrant returns (uint256 amount) {
+        require(msg.sender == treasury, "NOT TREASURY");
+        amount = treasuryCredit;
+        require(amount > 0, "NO TREASURY CREDIT");
+        treasuryCredit = 0;
+
+        (bool success, ) = payable(treasury).call{value: amount}("");
+
+        require(success, "ETH TRANSFER FAILED");
+        emit TreasuryWithdrawn(treasury, amount);
+        return amount;
+	}
 
     function settleCommit(uint256 commitmentId) external returns (uint256 refundWei, uint256 proceedsWei) {
         require(commitmentId > 0 && commitmentId <= commitmentCount,"INVALID COMMITMENT");

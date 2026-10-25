@@ -230,3 +230,46 @@ describe("DomainRegistrar settlement", function () {
         expect(await ethers.provider.getBalance(await registrar.getAddress())).to.equal(deposit);
     });
 });
+
+describe("DomainRegistrar withdrawals", function () {
+    it("pays the bidder refund and treasury proceeds", async function () {
+        const [treasury, bidder] = await ethers.getSigners();
+
+        const registrar = await ethers.deployContract("DomainRegistrar");
+        await registrar.waitForDeployment();
+
+        const roundId      = 1n;
+        const commitmentId = 1n;
+        const label        = "alice";
+        const bidWei       = ethers.parseEther("0.006");
+        const salt         = ethers.id("test-only-withdrawal-salt");
+        const deposit      = await registrar.COMMIT_DEPOSIT();
+        const refundWei    = deposit - bidWei;
+
+        const digest = await registrar.computeCommitment(roundId,bidder.address,label,bidWei,salt);
+        const commitTransaction = await registrar.connect(bidder).commit(roundId,digest,{ value: deposit });
+        await commitTransaction.wait();
+
+        const round = await registrar.getRound(roundId);
+        await networkHelpers.time.increaseTo(round.commitEnd);
+
+        const revealTransaction = await registrar.connect(bidder).reveal(commitmentId,label,bidWei,salt);
+        await revealTransaction.wait();
+        await networkHelpers.time.increaseTo(round.revealEnd);
+
+        const settlementTransaction = await registrar.settleCommit(commitmentId);
+        await settlementTransaction.wait();
+
+        await expect(registrar.connect(bidder).withdrawRefund()).to.emit(registrar, "RefundWithdrawn").withArgs(bidder.address, refundWei);
+
+        expect(await registrar.refundCredits(bidder.address)).to.equal(0n);
+        expect(await registrar.totalRefundCredits()).to.equal(0n);
+        expect(await registrar.treasuryCredit()).to.equal(bidWei);
+        expect(await ethers.provider.getBalance(await registrar.getAddress())).to.equal(bidWei);
+
+        await expect(registrar.connect(treasury).withdrawTreasury()).to.emit(registrar, "TreasuryWithdrawn").withArgs(treasury.address, bidWei);
+
+        expect(await registrar.treasuryCredit()).to.equal(0n);
+        expect(await ethers.provider.getBalance(await registrar.getAddress())).to.equal(0n);
+    });
+});
