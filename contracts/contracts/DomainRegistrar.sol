@@ -1,5 +1,3 @@
-
-
 // SPDX-License-Identifier: UNLICENSED
 
 // COMMENTARY
@@ -107,34 +105,42 @@ contract DomainRegistrar {
         uint256         proceedsWei
     );
 
-	event RefundWithdrawn(
-		address indexed bidder,
-		uint256 amountWei
-	);
+    event RefundWithdrawn(
+        address indexed bidder,
+        uint256 amountWei
+    );
 
-	event TreasuryWithdrawn(
-		address indexed recipient,
-		uint256 amountWei
-	);
+    event TreasuryWithdrawn(
+        address indexed recipient,
+        uint256 amountWei
+    );
 
-	event AddressUpdated(
-		bytes32 indexed labelHash,
-		address indexed owner,
-		address indexed target,
-		string label
-	);
+    event AddressUpdated(
+        bytes32 indexed labelHash,
+        address indexed owner,
+        address indexed target,
+        string label
+    );
+
+    event DomainPayment(
+        bytes32 indexed labelHash,
+        address indexed sender,
+        address indexed recipient,
+        string  label,
+        uint256 amountWei
+    );
 
     constructor() {
         auctionStart = block.timestamp;
         treasury = msg.sender;
     }
 
-	modifier nonReentrant() {
-		require(!_withdrawing, "REENTRANT WITHDRAWAL");
-		_withdrawing = true;
-		_;  // we are running the function's body here
-		_withdrawing = false;
-	}
+    modifier nonReentrant() {
+        require(!_withdrawing, "REENTRANT WITHDRAWAL");
+        _withdrawing = true;
+        _;  // we are running the function's body here
+        _withdrawing = false;
+    }
 
     function commit(uint256 roundId , bytes32 digest) external payable returns (uint256 commitmentId) {
         require(roundId == getCurrentRound(), "WRONG ROUND");
@@ -234,7 +240,7 @@ contract DomainRegistrar {
         require(success, "ETH TRANSFER FAILED");
         emit TreasuryWithdrawn(treasury, amount);
         return amount;
-	}
+    }
 
     function settleCommit(uint256 commitmentId) external returns (uint256 refundWei, uint256 proceedsWei) {
         require(commitmentId > 0 && commitmentId <= commitmentCount,"INVALID COMMITMENT");
@@ -288,7 +294,7 @@ contract DomainRegistrar {
         domain.roundId = auction.roundId;
         domain.winningCommitmentId = auction.winningCommitmentId;
         domain.priceWei = auction.highestBidWei;
-		domain.resolutionAddress = owner;
+        domain.resolutionAddress = owner;
 
         emit DomainFinalized(
             labelHash,
@@ -308,39 +314,61 @@ contract DomainRegistrar {
 
 
 
-	function ownerOf(string memory label) public view returns (address) {
-		require(isValidLabel(label),  "INVALID LABEL");
-		return _domains[keccak256(bytes(label))].owner;
-	}
+    function ownerOf(string memory label) public view returns (address) {
+        require(isValidLabel(label),  "INVALID LABEL");
+        return _domains[keccak256(bytes(label))].owner;
+    }
 
-	function reservedRound(string memory label) public view returns (uint256) {
-		require(isValidLabel(label), "INVALID LABEL");
-		bytes32 labelHash   = keccak256(bytes(label));
-		if (_domains[labelHash].owner != address(0)) {
-			return 0;
-		}
-		return _auctions[labelHash].roundId;
-	}
+    function reservedRound(string memory label) public view returns (uint256) {
+        require(isValidLabel(label), "INVALID LABEL");
+        bytes32 labelHash   = keccak256(bytes(label));
+        if (_domains[labelHash].owner != address(0)) {
+            return 0;
+        }
+        return _auctions[labelHash].roundId;
+    }
 
-	function resolve(string memory label) public view returns (address) {
-		require(isValidLabel(label), "INVALID LABEL");
-		return _domains[keccak256(bytes(label))].resolutionAddress;
-	}
+    function resolve(string memory label) public view returns (address) {
+        require(isValidLabel(label), "INVALID LABEL");
+        return _domains[keccak256(bytes(label))].resolutionAddress;
+    }
 
-	function setAddress(string memory label, address target) external {
-		require(isValidLabel(label), "INVALID LABEL");
-		bytes32 labelHash   = keccak256(bytes(label));
-		DomainInfo storage domain = _domains[labelHash];
+    function setAddress(string memory label, address target) external {
+        require(isValidLabel(label), "INVALID LABEL");
+        bytes32 labelHash   = keccak256(bytes(label));
+        DomainInfo storage domain = _domains[labelHash];
 
-		require(domain.owner != address(0), "UNREGISTERED NAME");
-		require(msg.sender == domain.owner, "NOT OWNER");
-		require(target != address(0), "ZERO ADDRESS");
-		require(target != address(this), "INVALID TARGET");
+        require(domain.owner != address(0), "UNREGISTERED NAME");
+        require(msg.sender == domain.owner, "NOT OWNER");
+        require(target != address(0), "ZERO ADDRESS");
+        require(target != address(this), "INVALID TARGET");
 
-		domain.resolutionAddress = target;
+        domain.resolutionAddress = target;
 
-		emit AddressUpdated(labelHash, domain.owner, target, label);
-	}
+        emit AddressUpdated(labelHash, domain.owner, target, label);
+    }
+
+    function sendToDomain(string memory label,address expectedRecipient) external payable nonReentrant {
+        require(isValidLabel(label), "INVALID LABEL");
+        require(msg.value > 0, "ZERO PAYMENT");
+
+        bytes32 labelHash = keccak256(bytes(label));
+        DomainInfo storage domain = _domains[labelHash];
+
+        require(domain.owner != address(0), "UNREGISTERED NAME");
+
+        address recipient = domain.resolutionAddress;
+
+        require(recipient != address(0), "ZERO ADDRESS");
+        require(recipient != address(this), "INVALID TARGET");
+        require(recipient == expectedRecipient, "RECIPIENT CHANGED");
+
+        (bool success, ) = payable(recipient).call{value: msg.value}("");
+
+        require(success, "ETH TRANSFER FAILED");
+
+        emit DomainPayment(labelHash, msg.sender, recipient, label, msg.value);
+    }
 
     function getAuction(string memory label) public view returns (AuctionInfo memory) {
         // so we can eventually call something like getAuction("alice") to display our leading bid
