@@ -1,14 +1,32 @@
 import {
   useEffect,
   useState,
+  useCallback,
 } from "react"
 
-import { Navbar } from "./Navbar"
-import { DomainSearch } from "./DomainSearch"
-import { DomainStatusCard } from "./DomainStatusCard"
-import { BidForm } from "./BidForm"
-import { RevealSection } from "./RevealSection"
-import { PaymentSection } from "./PaymentSection"
+import {
+  Navbar,
+} from "./Navbar"
+
+import {
+  DomainSearch,
+} from "./DomainSearch"
+
+import {
+  DomainStatusCard,
+} from "./DomainStatusCard"
+
+import {
+  BidForm,
+} from "./BidForm"
+
+import {
+  RevealSection,
+} from "./RevealSection"
+
+import {
+  PaymentSection,
+} from "./PaymentSection"
 
 import {
   checkDomain,
@@ -22,65 +40,104 @@ import {
 } from "./handlers"
 
 export default function NtuApp() {
-  const [account, setAccount] =
-    useState<string | null>(null)
+  const [
+    account,
+    setAccount,
+  ] =
+    useState<
+      string | null
+    >(null)
 
-  const [connecting, setConnecting] =
+  const [
+    connecting,
+    setConnecting,
+  ] =
     useState(false)
 
-  const [domain, setDomain] =
-    useState<DomainInfo | null>(null)
+  const [
+    domain,
+    setDomain,
+  ] =
+    useState<
+      DomainInfo | null
+    >(null)
 
-  const [searching, setSearching] =
+  const [
+    searching,
+    setSearching,
+  ] =
     useState(false)
 
-  const [committing, setCommitting] =
+  const [
+    committing,
+    setCommitting,
+  ] =
     useState(false)
 
-
-/* Reveal recovery: Load any previously saved commitments when the app first opens */
+  /*
+    Load reveal recovery data.
+  */
   const [
     commitments,
     setCommitments,
-  ] = useState<Commitment[]>(() => {
-    try {
-      const saved =
-        localStorage.getItem(
-          "ntu-commitments"
+  ] =
+    useState<
+      Commitment[]
+    >(() => {
+      try {
+        const saved =
+          localStorage.getItem(
+            "ntu-commitments"
+          )
+
+        return saved
+          ? JSON.parse(
+              saved
+            )
+          : []
+      } catch (
+        error
+      ) {
+        console.error(
+          "Failed to load commitments:",
+          error
         )
 
-      return saved
-        ? JSON.parse(saved)
-        : []
-    } catch (error) {
-      console.error(
-        "Failed to load saved commitments:",
-        error
-      )
-
-      return []
-    }
-  })
+        return []
+      }
+    })
 
   const [
     revealingHash,
     setRevealingHash,
-  ] = useState<string | null>(null)
+  ] =
+    useState<
+      string | null
+    >(null)
 
-  const [sending, setSending] =
+  const [
+    sending,
+    setSending,
+  ] =
     useState(false)
 
   const [
     lastPayment,
     setLastPayment,
-  ] = useState<{
-    name: string
-    amount: string
-    resolvedAddress: string
-    txHash: string
-  } | null>(null)
+  ] =
+    useState<{
+      name: string
+      amount: string
+      resolvedAddress: string
+      txHash: string
+    } | null>(null)
 
-  /* Metamask Event Listeners */
+  /*
+    ========================================================
+    METAMASK EVENTS
+    ========================================================
+  */
+
   useEffect(() => {
     const ethereum =
       window.ethereum as any
@@ -89,33 +146,29 @@ export default function NtuApp() {
       return
     }
 
-    const handleAccountsChanged = (
-      accounts: string[]
-    ) => {
-      console.log(
-        "Accounts changed:",
-        accounts
-      )
-
-      if (accounts.length === 0) {
-        setAccount(null)
-      } else {
-        setAccount(
-          accounts[0]
-        )
+    const handleAccountsChanged =
+      (
+        accounts:
+          string[]
+      ) => {
+        if (
+          accounts.length ===
+          0
+        ) {
+          setAccount(
+            null
+          )
+        } else {
+          setAccount(
+            accounts[0]
+          )
+        }
       }
-    }
 
-    const handleChainChanged = (
-      chainId: string
-    ) => {
-      console.log(
-        "Network changed:",
-        chainId
-      )
-
-      window.location.reload()
-    }
+    const handleChainChanged =
+      () => {
+        window.location.reload()
+      }
 
     ethereum.on(
       "accountsChanged",
@@ -140,7 +193,12 @@ export default function NtuApp() {
     }
   }, [])
 
-  /* Save committments */
+  /*
+    ========================================================
+    SAVE REVEAL DATA
+    ========================================================
+  */
+
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -149,161 +207,363 @@ export default function NtuApp() {
           commitments
         )
       )
-    } catch (error) {
+    } catch (
+      error
+    ) {
       console.error(
         "Failed to save commitments:",
         error
       )
     }
-  }, [commitments])
+  }, [
+    commitments,
+  ])
 
-  /* Connect wallet */
-  const handleConnect = async () => {
-    setConnecting(true)
+  /*
+    ========================================================
+    WALLET
+    ========================================================
+  */
 
-    try {
-      const address =
-        await connectWallet()
-
-      console.log(
-        "Connected wallet:",
-        address
+  const handleConnect =
+    async () => {
+      setConnecting(
+        true
       )
 
-      setAccount(address)
-    } catch (error) {
-      console.error(
-        "Wallet connection failed:",
+      try {
+        const address =
+          await connectWallet()
+
+        setAccount(
+          address
+        )
+      } catch (
         error
-      )
+      ) {
+        console.error(
+          error
+        )
 
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Failed to connect wallet"
-      )
-    } finally {
-      setConnecting(false)
+        alert(
+          error instanceof
+            Error
+            ? error.message
+            : "Failed to connect wallet"
+        )
+      } finally {
+        setConnecting(
+          false
+        )
+      }
     }
-  }
 
-  /* Disconnect wallet */
   const handleDisconnect =
     async () => {
       await disconnectWallet()
 
-      setAccount(null)
+      setAccount(
+        null
+      )
     }
 
-  /* Domain search (mock data) */
-  const handleSearch = async (
-    name: string
-  ) => {
-    setSearching(true)
+  /*
+    ========================================================
+    DOMAIN SEARCH
+    ========================================================
+  */
 
-    try {
-      const result =
-        await checkDomain(name)
+  const handleSearch =
+    useCallback(
+      async (
+        name: string
+      ) => {
+        setSearching(
+          true
+        )
 
-      setDomain(result)
-    } catch (error) {
-      console.error(
-        "Domain search failed:",
-        error
-      )
+        try {
+          const result =
+            await checkDomain(
+              name
+            )
 
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Failed to search domain"
-      )
-    } finally {
-      setSearching(false)
-    }
-  }
+          setDomain(
+            result
+          )
+        } catch (
+          error
+        ) {
+          console.error(
+            "Domain search failed:",
+            error
+          )
 
-  /* Commit bid (mock logic) */
-  const handleCommit = async (
-    params: {
-      name: string
-      amount: string
-      salt: string
-    }
-  ) => {
-    setCommitting(true)
-
-    try {
-      const commitment =
-        await commitBid(params)
-
-      setCommitments(
-        (prev) => [
-          commitment,
-          ...prev,
-        ]
-      )
-    } catch (error) {
-      console.error(
-        "Commit failed:",
-        error
-      )
-
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Failed to commit bid"
-      )
-    } finally {
-      setCommitting(false)
-    }
-  }
-
-  /*Reveal bid*/
-  const handleReveal = async (
-    commitment: Commitment
-  ) => {
-    setRevealingHash(
-      commitment.hash
+          alert(
+            error instanceof
+              Error
+              ? error.message
+              : "Failed to search domain"
+          )
+        } finally {
+          setSearching(
+            false
+          )
+        }
+      },
+      []
     )
 
-    try {
-      await revealBid(
-        commitment
-      )
+  /*
+    Called automatically when the
+    commit/reveal countdown reaches zero.
+  */
 
-      setCommitments(
-        (prev) =>
-          prev.map((c) =>
-            c.hash ===
-            commitment.hash
-              ? {
-                  ...c,
-                  revealed: true,
-                }
-              : c
+  const handlePhaseExpired =
+    useCallback(
+      async () => {
+        if (
+          !domain
+        ) {
+          return
+        }
+
+        try {
+          const updated =
+            await checkDomain(
+              domain.name
+            )
+
+          setDomain(
+            updated
           )
+        } catch (
+          error
+        ) {
+          console.error(
+            "Failed to refresh auction phase:",
+            error
+          )
+        }
+      },
+      [domain]
+    )
+
+  /*
+    ========================================================
+    COMMIT BID
+    ========================================================
+  */
+
+  const handleCommit =
+    async (
+      params: {
+        name: string
+        amount: string
+        salt: string
+      }
+    ) => {
+      if (
+        !account
+      ) {
+        alert(
+          "Connect your wallet before committing a bid."
+        )
+
+        return
+      }
+
+      /*
+        Frontend duplicate safeguard.
+      */
+
+      const existing =
+        commitments.find(
+          (
+            commitment
+          ) =>
+            commitment.name.toLowerCase() ===
+              params.name.toLowerCase() &&
+            commitment.bidder?.toLowerCase() ===
+              account.toLowerCase() &&
+            !commitment.revealed
+        )
+
+      if (
+        existing
+      ) {
+        alert(
+          `You already have an active commitment for ${params.name}.ntu with this wallet.`
+        )
+
+        return
+      }
+
+      setCommitting(
+        true
       )
-    } catch (error) {
-      console.error(
-        "Reveal failed:",
+
+      try {
+        const commitment =
+          await commitBid(
+            params
+          )
+
+        setCommitments(
+          (
+            previous
+          ) => [
+            commitment,
+            ...previous,
+          ]
+        )
+
+        /*
+          Refresh domain state after
+          successful commit.
+        */
+
+        const updated =
+          await checkDomain(
+            params.name
+          )
+
+        setDomain(
+          updated
+        )
+      } catch (
         error
-      )
+      ) {
+        console.error(
+          "Commit failed:",
+          error
+        )
 
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Failed to reveal bid"
-      )
-    } finally {
-      setRevealingHash(null)
+        alert(
+          error instanceof
+            Error
+            ? error.message
+            : "Failed to commit bid"
+        )
+      } finally {
+        setCommitting(
+          false
+        )
+      }
     }
-  }
 
-  /* Download reveal backup */
+  /*
+    ========================================================
+    REVEAL BID
+    ========================================================
+  */
+
+  const handleReveal =
+    async (
+      commitment:
+        Commitment
+    ) => {
+      if (
+        !account
+      ) {
+        alert(
+          "Connect your wallet before revealing."
+        )
+
+        return
+      }
+
+      if (
+        commitment.bidder &&
+        commitment.bidder.toLowerCase() !==
+          account.toLowerCase()
+      ) {
+        alert(
+          "Switch to the wallet that created this commitment before revealing."
+        )
+
+        return
+      }
+
+      setRevealingHash(
+        commitment.hash
+      )
+
+      try {
+        const result =
+          await revealBid(
+            commitment
+          )
+
+        setCommitments(
+          (
+            previous
+          ) =>
+            previous.map(
+              (
+                current
+              ) =>
+                current.hash ===
+                commitment.hash
+                  ? {
+                      ...current,
+
+                      revealed:
+                        true,
+
+                      valid:
+                        result.valid,
+                    }
+                  : current
+            )
+        )
+
+        /*
+          Refresh domain auction info,
+          because the highest bid may
+          have changed after reveal.
+        */
+
+        const updated =
+          await checkDomain(
+            commitment.name
+          )
+
+        setDomain(
+          updated
+        )
+      } catch (
+        error
+      ) {
+        console.error(
+          "Reveal failed:",
+          error
+        )
+
+        alert(
+          error instanceof
+            Error
+            ? error.message
+            : "Failed to reveal bid"
+        )
+      } finally {
+        setRevealingHash(
+          null
+        )
+      }
+    }
+
+  /*
+    ========================================================
+    DOWNLOAD BACKUP
+    ========================================================
+  */
+
   const handleDownloadBackup =
     () => {
       if (
-        commitments.length === 0
+        commitments.length ===
+        0
       ) {
         alert(
           "No commitments to back up."
@@ -321,9 +581,12 @@ export default function NtuApp() {
 
       const blob =
         new Blob(
-          [data],
+          [
+            data,
+          ],
           {
-            type: "application/json",
+            type:
+              "application/json",
           }
         )
 
@@ -337,7 +600,9 @@ export default function NtuApp() {
           "a"
         )
 
-      anchor.href = url
+      anchor.href =
+        url
+
       anchor.download =
         "ntu-reveal-backup.json"
 
@@ -351,18 +616,29 @@ export default function NtuApp() {
         anchor
       )
 
-      URL.revokeObjectURL(url)
+      URL.revokeObjectURL(
+        url
+      )
     }
 
-  /* Import reveal backup */
+  /*
+    ========================================================
+    IMPORT BACKUP
+    ========================================================
+  */
+
   const handleImportBackup =
-    async (file: File) => {
+    async (
+      file: File
+    ) => {
       try {
         const text =
           await file.text()
 
         const imported =
-          JSON.parse(text)
+          JSON.parse(
+            text
+          )
 
         if (
           !Array.isArray(
@@ -376,7 +652,9 @@ export default function NtuApp() {
 
         const valid =
           imported.every(
-            (item) =>
+            (
+              item
+            ) =>
               typeof item.name ===
                 "string" &&
               typeof item.amount ===
@@ -393,7 +671,9 @@ export default function NtuApp() {
                 "boolean"
           )
 
-        if (!valid) {
+        if (
+          !valid
+        ) {
           throw new Error(
             "Backup file contains invalid commitment data."
           )
@@ -406,54 +686,86 @@ export default function NtuApp() {
         alert(
           "Reveal backup imported successfully."
         )
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
-          "Backup import failed:",
           error
         )
 
         alert(
-          error instanceof Error
+          error instanceof
+            Error
             ? error.message
             : "Failed to import reveal backup."
         )
       }
     }
 
-  /* Payment (mock logic) */
-  const handleSend = async (
-    params: {
-      name: string
-      amount: string
-    }
-  ) => {
-    setSending(true)
+  /*
+    ========================================================
+    PAYMENT
+    ========================================================
+  */
 
-    try {
-      const result =
-        await sendPayment(
-          params
+  const handleSend =
+    async (
+      params: {
+        name: string
+        amount: string
+      }
+    ) => {
+      if (
+        !account
+      ) {
+        alert(
+          "Connect your wallet before sending ETH."
         )
 
-      setLastPayment({
-        ...params,
-        ...result,
-      })
-    } catch (error) {
-      console.error(
-        "Payment failed:",
-        error
+        return
+      }
+
+      setSending(
+        true
       )
 
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Failed to send payment"
-      )
-    } finally {
-      setSending(false)
+      try {
+        const result =
+          await sendPayment(
+            params
+          )
+
+        setLastPayment({
+          ...params,
+
+          ...result,
+        })
+      } catch (
+        error
+      ) {
+        console.error(
+          "Payment failed:",
+          error
+        )
+
+        alert(
+          error instanceof
+            Error
+            ? error.message
+            : "Failed to send payment"
+        )
+      } finally {
+        setSending(
+          false
+        )
+      }
     }
-  }
+
+  /*
+    ========================================================
+    UI
+    ========================================================
+  */
 
   return (
     <div className="relative min-h-screen bg-zinc-50 text-zinc-900">
@@ -463,7 +775,9 @@ export default function NtuApp() {
       />
 
       <Navbar
-        account={account}
+        account={
+          account
+        }
         connecting={
           connecting
         }
@@ -486,12 +800,19 @@ export default function NtuApp() {
         />
 
         <DomainStatusCard
-          domain={domain}
+          domain={
+            domain
+          }
+          onPhaseExpired={
+            handlePhaseExpired
+          }
         />
 
         <div className="grid gap-6 lg:grid-cols-2">
           <BidForm
-            domain={domain}
+            domain={
+              domain
+            }
             account={
               account
             }
@@ -507,7 +828,12 @@ export default function NtuApp() {
             commitments={
               commitments
             }
-            domain={domain}
+            domain={
+              domain
+            }
+            account={
+              account
+            }
             revealingHash={
               revealingHash
             }
@@ -524,8 +850,12 @@ export default function NtuApp() {
         </div>
 
         <PaymentSection
-          account={account}
-          sending={sending}
+          account={
+            account
+          }
+          sending={
+            sending
+          }
           lastPayment={
             lastPayment
           }

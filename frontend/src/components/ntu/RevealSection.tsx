@@ -21,6 +21,7 @@ import {
 export function RevealSection({
   commitments,
   domain,
+  account,
   revealingHash,
   onReveal,
   onDownloadBackup,
@@ -28,6 +29,7 @@ export function RevealSection({
 }: {
   commitments: Commitment[]
   domain: DomainInfo | null
+  account: string | null
   revealingHash: string | null
   onReveal: (commitment: Commitment) => void
   onDownloadBackup: () => void
@@ -57,15 +59,12 @@ export function RevealSection({
             accept=".json,application/json"
             className="hidden"
             onChange={(event) => {
-              const file =
-                event.target.files?.[0]
+              const file = event.target.files?.[0]
 
               if (file) {
                 onImportBackup(file)
               }
 
-              // Allows the same backup file
-              // to be selected again later.
               event.target.value = ""
             }}
           />
@@ -95,6 +94,12 @@ export function RevealSection({
       ) : (
         <ul className="flex flex-col gap-3">
           {commitments.map((c) => {
+            const correctWallet =
+              !!account &&
+              !!c.bidder &&
+              c.bidder.toLowerCase() ===
+                account.toLowerCase()
+
             const inReveal =
               domain?.name === c.name &&
               domain.status === "reveal"
@@ -114,7 +119,10 @@ export function RevealSection({
 
                   <CommitmentBadge
                     revealed={c.revealed}
-                    ready={inReveal}
+                    ready={
+                      inReveal &&
+                      correctWallet
+                    }
                   />
                 </div>
 
@@ -125,6 +133,27 @@ export function RevealSection({
 
                   <dd className="text-right font-mono text-zinc-800">
                     {c.amount} ETH
+                  </dd>
+
+                  <dt className="text-zinc-500">
+                    Wallet
+                  </dt>
+
+                  <dd className="text-right font-mono text-zinc-800">
+                    {c.bidder
+                      ? shortenHex(
+                          c.bidder,
+                          6
+                        )
+                      : "—"}
+                  </dd>
+
+                  <dt className="text-zinc-500">
+                    Round
+                  </dt>
+
+                  <dd className="text-right font-mono text-zinc-800">
+                    {c.roundId ?? "—"}
                   </dd>
 
                   <dt className="text-zinc-500">
@@ -163,12 +192,16 @@ export function RevealSection({
                 {!c.revealed && (
                   <Button
                     variant={
-                      inReveal
+                      inReveal &&
+                      correctWallet
                         ? "primary"
                         : "secondary"
                     }
                     className="mt-4 h-10 w-full"
-                    disabled={!inReveal}
+                    disabled={
+                      !inReveal ||
+                      !correctWallet
+                    }
                     loading={
                       revealingHash ===
                       c.hash
@@ -177,9 +210,13 @@ export function RevealSection({
                       onReveal(c)
                     }
                   >
-                    {inReveal
-                      ? "Reveal bid"
-                      : "Available in reveal phase"}
+                    {!account
+                      ? "Connect wallet to reveal"
+                      : !correctWallet
+                        ? "Switch to original wallet"
+                        : inReveal
+                          ? "Reveal bid"
+                          : "Available in reveal phase"}
                   </Button>
                 )}
               </li>
@@ -190,7 +227,7 @@ export function RevealSection({
 
       <div className="mt-4">
         <Notice>
-          Keep your salt safe. The backup file contains information required to reveal your bid.
+          Keep your salt safe. You must use the same wallet, bid and salt to reveal your commitment.
         </Notice>
       </div>
     </Card>
