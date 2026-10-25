@@ -50,6 +50,7 @@ contract DomainRegistrar {
         uint256 roundId;
         uint256 winningCommitmentId;
         uint256 priceWei;
+        address resolutionAddress;
     }
 
     uint256 public constant  MAX_LABEL_BYTES = 32;  // an unsigned integer of 256 bit integer type with the name MAX_LABEL_BYTES and a value of 32
@@ -114,6 +115,13 @@ contract DomainRegistrar {
 	event TreasuryWithdrawn(
 		address indexed recipient,
 		uint256 amountWei
+	);
+
+	event AddressUpdated(
+		bytes32 indexed labelHash,
+		address indexed owner,
+		address indexed target,
+		string label
 	);
 
     constructor() {
@@ -280,6 +288,7 @@ contract DomainRegistrar {
         domain.roundId = auction.roundId;
         domain.winningCommitmentId = auction.winningCommitmentId;
         domain.priceWei = auction.highestBidWei;
+		domain.resolutionAddress = owner;
 
         emit DomainFinalized(
             labelHash,
@@ -297,9 +306,41 @@ contract DomainRegistrar {
         return _domains[keccak256(bytes(label))];
     }
 
-    function resolve(string memory label) public view returns (address) {
-        return _domains[keccak256(bytes(label))].owner;
-    }
+
+
+	function ownerOf(string memory label) public view returns (address) {
+		require(isValidLabel(label),  "INVALID LABEL");
+		return _domains[keccak256(bytes(label))].owner;
+	}
+
+	function reservedRound(string memory label) public view returns (uint256) {
+		require(isValidLabel(label), "INVALID LABEL");
+		bytes32 labelHash   = keccak256(bytes(label));
+		if (_domains[labelHash].owner != address(0)) {
+			return 0;
+		}
+		return _auctions[labelHash].roundId;
+	}
+
+	function resolve(string memory label) public view returns (address) {
+		require(isValidLabel(label), "INVALID LABEL");
+		return _domains[keccak256(bytes(label))].resolutionAddress;
+	}
+
+	function setAddress(string memory label, address target) external {
+		require(isValidLabel(label), "INVALID LABEL");
+		bytes32 labelHash   = keccak256(bytes(label));
+		DomainInfo storage domain = _domains[labelHash];
+
+		require(domain.owner != address(0), "UNREGISTERED NAME");
+		require(msg.sender == domain.owner, "NOT OWNER");
+		require(target != address(0), "ZERO ADDRESS");
+		require(target != address(this), "INVALID TARGET");
+
+		domain.resolutionAddress = target;
+
+		emit AddressUpdated(labelHash, domain.owner, target, label);
+	}
 
     function getAuction(string memory label) public view returns (AuctionInfo memory) {
         // so we can eventually call something like getAuction("alice") to display our leading bid

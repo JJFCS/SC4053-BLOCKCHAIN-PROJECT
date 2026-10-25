@@ -14,15 +14,15 @@ describe("DomainRegistrar commitment", function () {
         const registrar = await ethers.deployContract("DomainRegistrar");
         await registrar.waitForDeployment();
 
-        const [bidder] = await ethers.getSigners();
+        const [bidder]    = await ethers.getSigners();
         const networkInfo = await ethers.provider.getNetwork();
 
-        const chainId = networkInfo.chainId;
+        const chainId          = networkInfo.chainId;
         const registrarAddress = await registrar.getAddress();
-        const roundId = 1n;
-        const label = "alice";
-        const bidWei = ethers.parseEther("0.004");
-        const salt = ethers.id("test-only-salt");
+        const roundId          = 1n;
+        const label            = "alice";
+        const bidWei           = ethers.parseEther("0.004");
+        const salt             = ethers.id("test-only-salt");
 
         const encoded = ethers.AbiCoder.defaultAbiCoder().encode(
             ["uint256", "address", "uint256", "address", "string", "uint256", "bytes32"],
@@ -30,14 +30,7 @@ describe("DomainRegistrar commitment", function () {
         );
 
         const javascriptHash = ethers.keccak256(encoded);
-
-        const solidityHash = await registrar.computeCommitment(
-            roundId,
-            bidder.address,
-            label,
-            bidWei,
-            salt
-        );
+        const solidityHash = await registrar.computeCommitment(roundId,bidder.address,label,bidWei,salt);
 
         expect(javascriptHash).to.equal(solidityHash);
     });
@@ -63,34 +56,24 @@ describe("DomainRegistrar reveal", function () {
         const registrar = await ethers.deployContract("DomainRegistrar");
         await registrar.waitForDeployment();
 
-        const [bidder] = await ethers.getSigners();
+        const [bidder]  = await ethers.getSigners();
 
-        const roundId = 1n;
+        const roundId      = 1n;
         const commitmentId = 1n;
-        const label = "alice";
-        const bidWei = ethers.parseEther("0.004");
-        const salt = ethers.id("test-only-reveal-salt");
-        const deposit = await registrar.COMMIT_DEPOSIT();
+        const label        = "alice";
+        const bidWei       = ethers.parseEther("0.004");
+        const salt         = ethers.id("test-only-reveal-salt");
+        const deposit      = await registrar.COMMIT_DEPOSIT();
 
-        const digest = await registrar.computeCommitment(
-            roundId,
-            bidder.address,
-            label,
-            bidWei,
-            salt
-        );
+        const digest = await registrar.computeCommitment(roundId,bidder.address,label,bidWei,salt);
 
-        const commitTransaction = await registrar.commit(roundId,digest,
-            { value: deposit }
-        );
+        const commitTransaction = await registrar.commit(roundId,digest,{ value: deposit });
         await commitTransaction.wait();
 
         const round = await registrar.getRound(roundId);
         await networkHelpers.time.increaseTo(round.commitEnd);
 
-        await expect(
-            registrar.reveal(commitmentId, label, bidWei, salt)
-        )
+        await expect(registrar.reveal(commitmentId, label, bidWei, salt))
             .to.emit(registrar, "CommitmentRevealed")
             .withArgs(commitmentId,roundId,bidder.address,label,bidWei,true);
 
@@ -111,45 +94,27 @@ describe("DomainRegistrar ownership", function () {
 
         const [bidder, finalizer] = await ethers.getSigners();
 
-        const roundId = 1n;
+        const roundId      = 1n;
         const commitmentId = 1n;
-        const label = "alice";
-        const bidWei = ethers.parseEther("0.004");
-        const salt = ethers.id("test-only-ownership-salt");
-        const deposit = await registrar.COMMIT_DEPOSIT();
+        const label        = "alice";
+        const bidWei       = ethers.parseEther("0.004");
+        const salt         = ethers.id("test-only-ownership-salt");
+        const deposit      = await registrar.COMMIT_DEPOSIT();
 
-        const digest = await registrar.computeCommitment(
-            roundId,
-            bidder.address,
-            label,
-            bidWei,
-            salt
-        );
+        const digest = await registrar.computeCommitment(roundId, bidder.address, label, bidWei, salt);
 
-        const commitTransaction = await registrar.connect(bidder).commit(
-            roundId,
-            digest,
-            { value: deposit }
-        );
+        const commitTransaction = await registrar.connect(bidder).commit(roundId, digest, { value: deposit });
         await commitTransaction.wait();
 
         const round = await registrar.getRound(roundId);
         await networkHelpers.time.increaseTo(round.commitEnd);
 
-        const revealTransaction = await registrar.connect(bidder).reveal(
-            commitmentId,
-            label,
-            bidWei,
-            salt
-        );
+        const revealTransaction = await registrar.connect(bidder).reveal(commitmentId, label, bidWei, salt);
         await revealTransaction.wait();
 
-        expect(await registrar.resolve(label)).to.equal(
-            ethers.ZeroAddress
-        );
+        expect(await registrar.resolve(label)).to.equal(ethers.ZeroAddress);
 
         await networkHelpers.time.increaseTo(round.revealEnd);
-
         await expect(registrar.connect(finalizer).finalizeName(label))
             .to.emit(registrar, "DomainFinalized")
             .withArgs(
@@ -179,40 +144,24 @@ describe("DomainRegistrar settlement", function () {
         const registrar = await ethers.deployContract("DomainRegistrar");
         await registrar.waitForDeployment();
 
-        const roundId = 1n;
+        const roundId      = 1n;
         const commitmentId = 1n;
-        const label = "alice";
-        const bidWei = ethers.parseEther("0.006");
-        const salt = ethers.id("test-only-settlement-salt");
-        const deposit = await registrar.COMMIT_DEPOSIT();
-        const refundWei = deposit - bidWei;
+        const label        = "alice";
+        const bidWei       = ethers.parseEther("0.006");
+        const salt         = ethers.id("test-only-settlement-salt");
+        const deposit      = await registrar.COMMIT_DEPOSIT();
+        const refundWei    = deposit - bidWei;
 
         expect(await registrar.treasury()).to.equal(treasury.address);
 
-        const digest = await registrar.computeCommitment(
-            roundId,
-            bidder.address,
-            label,
-            bidWei,
-            salt
-        );
-
-        const commitTransaction = await registrar.connect(bidder).commit(
-            roundId,
-            digest,
-            { value: deposit }
-        );
+        const digest = await registrar.computeCommitment(roundId, bidder.address, label, bidWei, salt);
+        const commitTransaction = await registrar.connect(bidder).commit(roundId, digest, { value: deposit });
         await commitTransaction.wait();
 
         const round = await registrar.getRound(roundId);
         await networkHelpers.time.increaseTo(round.commitEnd);
 
-        const revealTransaction = await registrar.connect(bidder).reveal(
-            commitmentId,
-            label,
-            bidWei,
-            salt
-        );
+        const revealTransaction = await registrar.connect(bidder).reveal(commitmentId, label, bidWei, salt);
         await revealTransaction.wait();
         await networkHelpers.time.increaseTo(round.revealEnd);
         await expect(registrar.connect(settler).settleCommit(commitmentId))
@@ -271,5 +220,58 @@ describe("DomainRegistrar withdrawals", function () {
 
         expect(await registrar.treasuryCredit()).to.equal(0n);
         expect(await ethers.provider.getBalance(await registrar.getAddress())).to.equal(0n);
+    });
+});
+
+describe("DomainRegistrar resolution", function () {
+    it("lets the owner update the payment address while preserving ownership", async function () {
+        const [bidder, recipient, outsider] = await ethers.getSigners();
+
+        const registrar = await ethers.deployContract("DomainRegistrar");
+        await registrar.waitForDeployment();
+
+        const roundId      = 1n;
+        const commitmentId = 1n;
+        const label        = "alice";
+        const bidWei       = ethers.parseEther("0.004");
+        const salt         = ethers.id("test-only-resolution-salt");
+        const deposit      = await registrar.COMMIT_DEPOSIT();
+
+        const digest = await registrar.computeCommitment(roundId,bidder.address,label,bidWei,salt);
+
+        const commitTransaction = await registrar.connect(bidder).commit(roundId,digest,{ value: deposit });
+        await commitTransaction.wait();
+
+        const round = await registrar.getRound(roundId);
+        await networkHelpers.time.increaseTo(round.commitEnd);
+
+        const revealTransaction = await registrar.connect(bidder).reveal(commitmentId,label,bidWei,salt);
+        await revealTransaction.wait();
+
+        expect(await registrar.ownerOf(label)).to.equal(ethers.ZeroAddress);
+        expect(await registrar.reservedRound(label)).to.equal(roundId);
+
+        await networkHelpers.time.increaseTo(round.revealEnd);
+
+        const finalizationTransaction = await registrar.finalizeName(label);
+        await finalizationTransaction.wait();
+
+        expect(await registrar.ownerOf(label)).to.equal(bidder.address);
+        expect(await registrar.resolve(label)).to.equal(bidder.address);
+        expect(await registrar.reservedRound(label)).to.equal(0n);
+
+        await expect(registrar.connect(outsider).setAddress(label, recipient.address)).to.be.revertedWith("NOT OWNER");
+        await expect(registrar.connect(bidder).setAddress(label, recipient.address)).to.emit(registrar, "AddressUpdated").withArgs(
+            ethers.keccak256(ethers.toUtf8Bytes(label)),
+            bidder.address,
+            recipient.address,
+            label
+        );
+
+        expect(await registrar.ownerOf(label)).to.equal(bidder.address);
+        expect(await registrar.resolve(label)).to.equal(recipient.address);
+
+        const domain = await registrar.getDomain(label);
+        expect(domain.resolutionAddress).to.equal(recipient.address);
     });
 });
