@@ -12,7 +12,8 @@ contract DomainRegistrarCommitTest is Test {
     bytes32         internal digest;
 
     function setUp() public {
-        registrar = new DomainRegistrar();
+        registrar = new DomainRegistrar(address(this));
+        registrar.startRound();
         deposit   = registrar.COMMIT_DEPOSIT();
         digest    = keccak256("example commitment");
 
@@ -51,19 +52,23 @@ contract DomainRegistrarCommitTest is Test {
     }
 
     function test_CommitRejectsWrongRoundAndRevealPhase() public {
-        vm.expectRevert(bytes("WRONG ROUND"));
+        vm.expectRevert(bytes("INVALID ROUND"));
         registrar.commit{value: deposit}(0, digest);
 
-        vm.expectRevert(bytes("WRONG ROUND"));
+        vm.expectRevert(bytes("INVALID ROUND"));
         registrar.commit{value: deposit}(2, digest);
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
 
         vm.expectRevert(bytes("NOT COMMIT PHASE"));
         registrar.commit{value: deposit}(1, digest);
 
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
 
+        vm.expectRevert(bytes("NOT COMMIT PHASE"));
+        registrar.commit{value: deposit}(1, digest);
+
+        registrar.startRound();
         vm.expectRevert(bytes("WRONG ROUND"));
         registrar.commit{value: deposit}(1, digest);
 
@@ -76,24 +81,26 @@ contract DomainRegistrarCommitTest is Test {
         registrar.commit{value: deposit}(1, bytes32(0));
     }
 
-    function test_CommitRejectsDuplicateButAllowsAnotherHash() public {
+    function test_CommitRejectsSecondCommitmentEvenWithAnotherHash() public {
         uint256 firstId = registrar.commit{value: deposit}(1, digest);
 
-        vm.expectRevert(bytes("DUPLICATE COMMITMENT"));
+        vm.expectRevert(bytes("ALREADY COMMITTED"));
         registrar.commit{value: deposit}(1, digest);
 
         assertEq(registrar.commitmentCount(), 1);
 
-        uint256 secondId = registrar.commit{value: deposit}(
+		vm.expectRevert(bytes("ALREADY COMMITTED"));
+		registrar.commit{value: deposit}(
             1,
             keccak256("another commitment")
         );
 
         assertEq(firstId, 1);
-        assertEq(secondId, 2);
-        assertEq(registrar.commitmentCount(), 2);
-        assertEq(registrar.totalLockedDeposits(), 2 * deposit);
-        assertEq(address(registrar).balance, 2 * deposit);
+		assertEq(registrar.getCommitmentId(1, address(this)), firstId);
+		assertEq(registrar.getCommitment(firstId).digest, digest);
+        assertEq(registrar.commitmentCount(), 1);
+        assertEq(registrar.totalLockedDeposits(), deposit);
+        assertEq(address(registrar).balance, deposit);
     }
 
     function test_CommitAllowsSameHashFromAnotherBidder() public {
@@ -128,7 +135,8 @@ contract DomainRegistrarCommitTest is Test {
     function test_CommitAcceptsNextRoundAtItsStart() public {
         uint256 firstId = registrar.commit{value: deposit}(1, digest);
 
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
+        registrar.startRound();
 
         uint256 secondId = registrar.commit{value: deposit}(2, digest);
 
