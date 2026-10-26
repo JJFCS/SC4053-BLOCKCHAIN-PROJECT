@@ -14,7 +14,7 @@ contract DomainRegistrarBidRulesTest is Test {
 	address internal carol = address(103);
 
 	function setUp() public {
-		registrar = new DomainRegistrar();
+		registrar = new DomainRegistrar(address(this));
 		registrar.startRound();
 		deposit = registrar.COMMIT_DEPOSIT();
 		vm.deal(alice, 10 * deposit);
@@ -241,7 +241,7 @@ contract DomainRegistrarBidRulesTest is Test {
 		bytes32 digest = registrar.getCommitment(id).digest;
 		vm.prank(bob);
 		registrar.commitBid{value: deposit}(1, digest);
-		DomainRegistrar other = new DomainRegistrar();
+		DomainRegistrar other = new DomainRegistrar(address(this));
 		other.startRound();
 		vm.prank(alice);
 		other.commitBid{value: deposit}(1, digest);

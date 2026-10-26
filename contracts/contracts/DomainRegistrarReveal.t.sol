@@ -14,7 +14,7 @@ contract DomainRegistrarRevealTest is Test {
     uint256 internal commitmentId;
 
     function setUp() public {
-        registrar = new DomainRegistrar();
+        registrar = new DomainRegistrar(address(this));
         registrar.startRound();
         deposit   = registrar.COMMIT_DEPOSIT();
         bidWei    = 0.004 ether;

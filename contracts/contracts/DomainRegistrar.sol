@@ -23,6 +23,9 @@ contract DomainRegistrar {
         uint256 revealEnd;
         Phase   phase;
 		uint256 pendingDomainCount;
+		uint256 deposit;
+		uint256 nonRevealPenalty;
+		address treasury;
     }
 
 	// These timestamps are stored when a round is explicitly started.
@@ -70,13 +73,13 @@ contract DomainRegistrar {
 	uint256 private _latestRoundId;
 	mapping(uint256 => RoundSchedule) private _rounds;
 
-    uint256 public constant COMMIT_DEPOSIT = 0.01 ether;
+	uint256 public constant COMMIT_DEPOSIT = 0.1 ether;
+	uint256 public constant NON_REVEAL_PENALTY = 0.001 ether;
     uint256 public commitmentCount;
     uint256 public totalLockedDeposits;
 
     address public immutable treasury;
-    uint256 public totalRefundCredits;
-    uint256 public treasuryCredit;
+	uint256 public totalWithdrawalCredits;
     bool private _withdrawing;
 
     mapping(uint256 => CommitmentInfo) private _commitments;
@@ -84,7 +87,7 @@ contract DomainRegistrar {
 	mapping(uint256 => mapping(bytes32 => AuctionInfo)) private _auctions;
 	mapping(bytes32 => uint256) private _reservedRounds;
     mapping(bytes32 => DomainInfo)     private _domains;
-    mapping(address => uint256)        public refundCredits;
+	mapping(address => uint256) public withdrawalCredits;
 
 	event RoundStarted(
 		uint256 indexed roundId,
@@ -127,15 +130,7 @@ contract DomainRegistrar {
         uint256         proceedsWei
     );
 
-    event RefundWithdrawn(
-        address indexed bidder,
-        uint256 amountWei
-    );
-
-    event TreasuryWithdrawn(
-        address indexed recipient,
-        uint256 amountWei
-    );
+	event Withdrawn(address indexed account, uint256 amountWei);
 
     event AddressUpdated(
         bytes32 indexed labelHash,
@@ -152,9 +147,11 @@ contract DomainRegistrar {
         uint256 amountWei
     );
 
-    constructor() {
-        treasury = msg.sender;
-    }
+	constructor(address treasuryAddress) {
+		require(treasuryAddress != address(0), "ZERO TREASURY");
+		require(NON_REVEAL_PENALTY > 0 && NON_REVEAL_PENALTY < COMMIT_DEPOSIT, "INVALID PENALTY");
+		treasury = treasuryAddress;
+	}
 
 	function startRound() external returns (uint256 roundId) {
 		if (_latestRoundId != 0) {
@@ -279,65 +276,73 @@ contract DomainRegistrar {
 		return true;
     }
 
-    function withdrawRefund() external nonReentrant returns (uint256 amount) {
-        amount = refundCredits[msg.sender];
-        require(amount > 0, "NO REFUND");
+	function withdraw() external nonReentrant {
+		_withdraw();
+	}
 
-        refundCredits[msg.sender] = 0;
-        totalRefundCredits -= amount;
+	// Earlier withdrawal names use the same account balance and shared guard.
+	function withdrawRefund() external nonReentrant returns (uint256) {
+		return _withdraw();
+	}
 
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
+	function withdrawTreasury() external nonReentrant returns (uint256) {
+		require(msg.sender == treasury, "NOT TREASURY");
+		return _withdraw();
+	}
 
-        require(success, "ETH TRANSFER FAILED");
-        emit RefundWithdrawn(msg.sender, amount);
-        return amount;
-    }
+	function _withdraw() internal returns (uint256 amount) {
+		amount = withdrawalCredits[msg.sender];
+		require(amount > 0, "NO CREDIT");
+		withdrawalCredits[msg.sender] = 0;
+		totalWithdrawalCredits -= amount;
 
-    function withdrawTreasury() external nonReentrant returns (uint256 amount) {
-        require(msg.sender == treasury, "NOT TREASURY");
-        amount = treasuryCredit;
-        require(amount > 0, "NO TREASURY CREDIT");
-        treasuryCredit = 0;
+		(bool success, ) = payable(msg.sender).call{value: amount}("");
+		require(success, "ETH TRANSFER FAILED");
+		emit Withdrawn(msg.sender, amount);
+		return amount;
+	}
 
-        (bool success, ) = payable(treasury).call{value: amount}("");
+	function settleBid(uint256 roundId) external {
+		uint256 commitmentId = getCommitmentId(roundId, msg.sender);
+		require(commitmentId != 0, "NO COMMITMENT");
+		_settleBid(commitmentId);
+	}
 
-        require(success, "ETH TRANSFER FAILED");
-        emit TreasuryWithdrawn(treasury, amount);
-        return amount;
-    }
+	function settleCommit(uint256 commitmentId) external returns (uint256 refundWei, uint256 proceedsWei) {
+		return _settleBid(commitmentId);
+	}
 
-    function settleCommit(uint256 commitmentId) external returns (uint256 refundWei, uint256 proceedsWei) {
-        require(commitmentId > 0 && commitmentId <= commitmentCount,"INVALID COMMITMENT");
-        CommitmentInfo storage info = _commitments[commitmentId];
+	function _settleBid(uint256 commitmentId) internal returns (uint256 refundWei, uint256 proceedsWei) {
+		require(commitmentId > 0 && commitmentId <= commitmentCount, "INVALID COMMITMENT");
+		CommitmentInfo storage info = _commitments[commitmentId];
+		require(msg.sender == info.bidder, "NOT BIDDER");
+		require(!info.settled, "ALREADY SETTLED");
+		require(getRound(info.roundId).phase == Phase.Ended, "ROUND NOT ENDED");
 
-        require(!info.settled, "ALREADY SETTLED");
-        require(getRound(info.roundId).phase == Phase.Ended,"ROUND NOT ENDED");
-
-        if (!info.revealed) {
-            proceedsWei = info.deposit;
-        } else if (!info.valid) {
-            refundWei   = info.deposit;
-        } else {
+		if (!info.revealed) {
+			proceedsWei = NON_REVEAL_PENALTY;
+			refundWei = info.deposit - proceedsWei;
+		} else {
 			AuctionInfo storage auction = _auctions[info.roundId][info.labelHash];
-            if (auction.winningCommitmentId == commitmentId) {
-                proceedsWei = info.bidWei;
-                refundWei   = info.deposit - info.bidWei;
-            } else {
-                refundWei   = info.deposit;
-            }
-        }
+			require(auction.finalized, "DOMAIN NOT FINALIZED");
+			refundWei = auction.winningCommitmentId == commitmentId
+				? info.deposit - info.bidWei
+				: info.deposit;
+		}
 
-        info.settled = true;
+		info.settled = true;
+		// The winning payment was already removed from locked deposits at finalization.
+		totalLockedDeposits -= refundWei + proceedsWei;
+		_credit(info.bidder, refundWei);
+		_credit(treasury, proceedsWei);
+		emit CommitmentSettled(commitmentId, info.roundId, info.bidder, refundWei, proceedsWei);
+		return (refundWei, proceedsWei);
+	}
 
-        totalLockedDeposits -= info.deposit;
-        refundCredits[info.bidder] += refundWei;
-        totalRefundCredits += refundWei;
-        treasuryCredit += proceedsWei;
-
-        emit CommitmentSettled(commitmentId,info.roundId,info.bidder,refundWei,proceedsWei);
-
-        return (refundWei, proceedsWei);
-    }
+	function _credit(address account, uint256 amount) internal {
+		withdrawalCredits[account] += amount;
+		totalWithdrawalCredits += amount;
+	}
 
     function finalizeName(string memory label) external returns (address owner) {
         require(isValidLabel(label), "INVALID LABEL");
@@ -379,6 +384,9 @@ contract DomainRegistrar {
 		auction.finalized = true;
 		delete _reservedRounds[labelHash];
 		_rounds[roundId].pendingDomainCount -= 1;
+		// Allocate the price once, without sending ETH during finalization.
+		totalLockedDeposits -= auction.highestBidWei;
+		_credit(treasury, auction.highestBidWei);
 
         emit DomainFinalized(
             labelHash,
@@ -493,6 +501,9 @@ contract DomainRegistrar {
 		info.commitEnd = schedule.commitEnd;
 		info.revealEnd = schedule.revealEnd;
 		info.pendingDomainCount = schedule.pendingDomainCount;
+		info.deposit = COMMIT_DEPOSIT;
+		info.nonRevealPenalty = NON_REVEAL_PENALTY;
+		info.treasury = treasury;
 
         if (block.timestamp < info.startTime) {
             info.phase = Phase.NotStarted;

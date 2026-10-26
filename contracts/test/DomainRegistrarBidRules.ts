@@ -20,7 +20,7 @@ function hashBid(
 }
 
 async function deployBidRules() {
-	const registrar = await ethers.deployContract("DomainRegistrar");
+	const registrar = await ethers.deployContract("DomainRegistrar", [(await ethers.getSigners())[0].address]);
 	await registrar.waitForDeployment();
 	await (await registrar.startRound()).wait();
 	const [bidder, other] = await ethers.getSigners();

@@ -1,224 +1,237 @@
-
 // SPDX-License-Identifier: UNLICENSED
-
 pragma solidity 0.8.34;
 
 import { Test } from "forge-std/Test.sol";
 import { DomainRegistrar } from "./DomainRegistrar.sol";
 
 contract DomainRegistrarSettlementTest is Test {
-    DomainRegistrar internal registrar;
-    uint256         internal deposit;
-    bytes32         internal salt;
-    uint256         internal aliceId;
-    uint256         internal bobId;
-    uint256         internal invalidId;
-    uint256         internal unrevealedId;
-    address         internal alice    = address(101);
-    address         internal bob      = address(102);
-    address         internal carol    = address(103);
-    address         internal dave     = address(104);
-    address         internal outsider = address(105);
+	DomainRegistrar internal registrar;
+	uint256 internal deposit;
+	uint256 internal penalty;
+	bytes32 internal salt = bytes32(uint256(123));
+	uint256 internal aliceId;
+	uint256 internal bobId;
+	uint256 internal invalidId;
+	uint256 internal unrevealedId;
+	address internal alice = address(101);
+	address internal bob = address(102);
+	address internal carol = address(103);
+	address internal dave = address(104);
+	address internal outsider = address(105);
+	address internal treasury = address(900);
+	uint256 internal constant WINNING_BID = 0.06 ether;
 
-    function setUp() public {
-        registrar = new DomainRegistrar();
-        registrar.startRound();
-        deposit   = registrar.COMMIT_DEPOSIT();
-        salt      = bytes32(uint256(123));
-
-        vm.deal(alice, 10 * deposit);
-        vm.deal(bob,   10 * deposit);
-        vm.deal(carol, 10 * deposit);
-        vm.deal(dave,  10 * deposit);
-
-        aliceId      = _commitBid(alice, "alice", 0.004 ether);
-        bobId        = _commitBid(bob, "alice", 0.006 ether);
-        invalidId    = _commitBid(carol, "invalid", 0);
-        unrevealedId = _commitBid(dave, "unopened", 0.003 ether);
-
-        vm.warp(registrar.getRound(1).startTime + 120);
-
-        vm.prank(alice);assertTrue(registrar.reveal(aliceId, "alice", 0.004 ether, salt));
-        vm.prank(bob);assertTrue(registrar.reveal(bobId, "alice", 0.006 ether, salt));
-        vm.prank(carol);
+	function setUp() public {
+		registrar = new DomainRegistrar(treasury);
+		registrar.startRound();
+		deposit = registrar.COMMIT_DEPOSIT();
+		penalty = registrar.NON_REVEAL_PENALTY();
+		vm.deal(alice, 10 * deposit);
+		vm.deal(bob, 10 * deposit);
+		vm.deal(carol, 10 * deposit);
+		vm.deal(dave, 10 * deposit);
+		aliceId = _commit(1, alice, "alice", 0.04 ether);
+		bobId = _commit(1, bob, "alice", WINNING_BID);
+		invalidId = _commit(1, carol, "invalid", 0);
+		unrevealedId = _commit(1, dave, "unopened", 0.03 ether);
+		vm.warp(registrar.getRound(1).commitEnd);
+		vm.prank(alice);
+		registrar.revealBid(1, "alice", 0.04 ether, salt);
+		vm.prank(bob);
+		registrar.revealBid(1, "alice", WINNING_BID, salt);
+		vm.prank(carol);
 		vm.expectRevert(bytes("INVALID BID"));
-		registrar.reveal(invalidId, "invalid", 0, salt);
-    }
+		registrar.revealBid(1, "invalid", 0, salt);
+	}
 
-    function test_SettlementStartsAt240SecondsAndCreditsWinner() public {
-        uint256 start = registrar.getRound(1).startTime;
+	function test_DeploymentUsesFixedDefaultsAndSuppliedTreasury() public view {
+		assertEq(deposit, 0.1 ether);
+		assertEq(penalty, 0.001 ether);
+		assertGt(penalty, 0);
+		assertLt(penalty, deposit);
+		assertEq(registrar.treasury(), treasury);
+		DomainRegistrar.RoundInfo memory round = registrar.getRound(1);
+		assertEq(round.deposit, deposit);
+		assertEq(round.nonRevealPenalty, penalty);
+		assertEq(round.treasury, treasury);
+		assertEq(round.commitEnd - round.startTime, 120);
+		assertEq(round.revealEnd - round.commitEnd, 120);
+	}
 
-        vm.warp(start + 239);
-        vm.expectRevert(bytes("ROUND NOT ENDED"));
-        registrar.settleCommit(bobId);
+	function test_RejectsZeroTreasuryAtDeployment() public {
+		vm.expectRevert(bytes("ZERO TREASURY"));
+		new DomainRegistrar(address(0));
+	}
 
-        assertFalse(registrar.getCommitment(bobId).settled);
-        assertEq(registrar.totalLockedDeposits(), 4 * deposit);
+	function test_FinalizationCreditsWinningPaymentExactlyOnceWithoutSendingETH() public {
+		_end();
+		vm.prank(outsider);
+		registrar.finalizeDomain(1, "alice");
+		assertEq(registrar.withdrawalCredits(treasury), WINNING_BID);
+		assertEq(registrar.totalWithdrawalCredits(), WINNING_BID);
+		assertEq(registrar.totalLockedDeposits(), 4 * deposit - WINNING_BID);
+		assertEq(treasury.balance, 0);
+		assertEq(bob.balance, 9 * deposit);
+		assertEq(registrar.ownerOf("alice"), bob);
+		assertEq(registrar.getRound(1).pendingDomainCount, 0);
+		vm.expectRevert(bytes("ALREADY FINALIZED"));
+		registrar.finalizeDomain(1, "alice");
+		vm.expectRevert(bytes("ALREADY FINALIZED"));
+		registrar.finalizeName("alice");
+		assertEq(registrar.withdrawalCredits(treasury), WINNING_BID);
+		_assertAccounting();
+	}
 
-        vm.warp(start + 240);
+	function test_SettlementStartsAtRevealDeadlineAndRequiresFinalization() public {
+		uint256 deadline = registrar.getRound(1).revealEnd;
+		vm.warp(deadline - 1);
+		vm.prank(bob);
+		vm.expectRevert(bytes("ROUND NOT ENDED"));
+		registrar.settleBid(1);
+		vm.warp(deadline);
+		vm.prank(bob);
+		vm.expectRevert(bytes("DOMAIN NOT FINALIZED"));
+		registrar.settleBid(1);
+		assertFalse(registrar.getCommitment(bobId).settled);
+		assertEq(registrar.totalWithdrawalCredits(), 0);
+		assertEq(registrar.totalLockedDeposits(), 4 * deposit);
+		registrar.finalizeDomain(1, "alice");
+		vm.prank(bob);
+		(uint256 refund, uint256 proceeds) = registrar.settleCommit(bobId);
+		assertEq(refund, deposit - WINNING_BID);
+		assertEq(proceeds, 0); // The price was credited during finalization.
+		assertEq(registrar.withdrawalCredits(bob), deposit - WINNING_BID);
+		assertEq(registrar.withdrawalCredits(treasury), WINNING_BID);
+		assertEq(registrar.totalLockedDeposits(), 3 * deposit);
+		assertTrue(registrar.getCommitmentForRound(1, bob).settled);
+		_assertAccounting();
+	}
 
-        vm.prank(outsider);
-        (uint256 refund, uint256 proceeds) = registrar.settleCommit(bobId);
+	function test_LosingBidAlsoWaitsForFinalizationThenGetsFullDeposit() public {
+		_end();
+		vm.prank(alice);
+		vm.expectRevert(bytes("DOMAIN NOT FINALIZED"));
+		registrar.settleBid(1);
+		assertFalse(registrar.getCommitment(aliceId).settled);
+		registrar.finalizeDomain(1, "alice");
+		vm.prank(alice);
+		registrar.settleBid(1);
+		assertEq(registrar.withdrawalCredits(alice), deposit);
+		assertEq(registrar.withdrawalCredits(treasury), WINNING_BID);
+		_assertAccounting();
+	}
 
-        assertEq(refund, 0.004 ether);
-        assertEq(proceeds, 0.006 ether);
-        assertEq(registrar.refundCredits(bob), 0.004 ether);
-        assertEq(registrar.refundCredits(outsider), 0);
-        assertEq(registrar.totalRefundCredits(), 0.004 ether);
-        assertEq(registrar.treasuryCredit(), 0.006 ether);
-        assertEq(registrar.totalLockedDeposits(), 3 * deposit);
-        assertTrue(registrar.getCommitment(bobId).settled);
+	function test_UnrevealedBidSettlesWithoutFinalizingOtherDomains() public {
+		_end();
+		vm.prank(dave);
+		(uint256 refund, uint256 proceeds) = registrar.settleCommit(unrevealedId);
+		assertEq(refund, deposit - penalty);
+		assertEq(proceeds, penalty);
+		assertEq(registrar.withdrawalCredits(dave), 0.099 ether);
+		assertEq(registrar.withdrawalCredits(treasury), penalty);
+		assertEq(registrar.getRound(1).pendingDomainCount, 1);
+		assertEq(registrar.ownerOf("alice"), address(0));
+		assertTrue(registrar.getCommitment(unrevealedId).settled);
+		_assertAccounting();
+	}
 
-        // the settlement records credits without sending eth
-        assertEq(bob.balance, 9 * deposit);
-        assertEq(address(registrar).balance, 4 * deposit);
+	function test_RejectedRevealFollowsNonRevealPenaltyPolicy() public {
+		_end();
+		vm.prank(carol);
+		registrar.settleBid(1);
+		DomainRegistrar.CommitmentInfo memory info = registrar.getCommitment(invalidId);
+		assertFalse(info.revealed);
+		assertFalse(info.valid);
+		assertTrue(info.settled);
+		assertEq(registrar.withdrawalCredits(carol), deposit - penalty);
+		assertEq(registrar.withdrawalCredits(treasury), penalty);
+		assertEq(registrar.reservedRound("invalid"), 0);
+		_assertAccounting();
+	}
 
-        _assertAccounting();
-    }
+	function test_AnotherWalletCannotSettleRecordedBid() public {
+		_end();
+		vm.prank(outsider);
+		vm.expectRevert(bytes("NOT BIDDER"));
+		registrar.settleCommit(bobId);
+		vm.prank(outsider);
+		vm.expectRevert(bytes("NO COMMITMENT"));
+		registrar.settleBid(1);
+		assertFalse(registrar.getCommitment(bobId).settled);
+		assertEq(registrar.withdrawalCredits(outsider), 0);
+		_assertAccounting();
+	}
 
-    function test_ValidLoserGetsFullDeposit() public {
-        vm.warp(registrar.getRound(1).startTime + 240);
+	function test_RejectsMissingAndRepeatedSettlementAcrossEntryPoints() public {
+		_end();
+		vm.expectRevert(bytes("INVALID ROUND"));
+		registrar.settleBid(0);
+		vm.expectRevert(bytes("INVALID ROUND"));
+		registrar.settleBid(2);
+		vm.expectRevert(bytes("INVALID COMMITMENT"));
+		registrar.settleCommit(0);
+		vm.expectRevert(bytes("INVALID COMMITMENT"));
+		registrar.settleCommit(5);
+		vm.prank(dave);
+		registrar.settleBid(1);
+		vm.startPrank(dave);
+		vm.expectRevert(bytes("ALREADY SETTLED"));
+		registrar.settleBid(1);
+		vm.expectRevert(bytes("ALREADY SETTLED"));
+		registrar.settleCommit(unrevealedId);
+		vm.stopPrank();
+		assertEq(registrar.withdrawalCredits(dave), deposit - penalty);
+		assertEq(registrar.withdrawalCredits(treasury), penalty);
+		_assertAccounting();
+	}
 
-        (uint256 refund, uint256 proceeds) = registrar.settleCommit(aliceId);
+	function test_AllDepositsRemainClaimableDuringLaterRound() public {
+		_end();
+		registrar.startRound();
+		_commit(2, alice, "later", 0.02 ether);
+		DomainRegistrar.RoundInfo memory later = registrar.getRound(2);
+		registrar.finalizeDomain(1, "alice");
+		_settle(alice);
+		_settle(bob);
+		_settle(carol);
+		_settle(dave);
+		assertEq(registrar.withdrawalCredits(alice), deposit);
+		assertEq(registrar.withdrawalCredits(bob), deposit - WINNING_BID);
+		assertEq(registrar.withdrawalCredits(carol), deposit - penalty);
+		assertEq(registrar.withdrawalCredits(dave), deposit - penalty);
+		assertEq(registrar.withdrawalCredits(treasury), WINNING_BID + 2 * penalty);
+		assertEq(registrar.totalWithdrawalCredits(), 4 * deposit);
+		assertEq(registrar.totalLockedDeposits(), deposit);
+		vm.prank(bob);
+		registrar.withdraw();
+		vm.prank(treasury);
+		registrar.withdraw();
+		assertEq(registrar.totalLockedDeposits(), deposit);
+		DomainRegistrar.RoundInfo memory afterClaims = registrar.getRound(2);
+		assertEq(afterClaims.startTime, later.startTime);
+		assertEq(afterClaims.commitEnd, later.commitEnd);
+		assertEq(afterClaims.revealEnd, later.revealEnd);
+		assertEq(afterClaims.pendingDomainCount, 0);
+		_assertAccounting();
+	}
 
-        assertEq(refund, deposit);
-        assertEq(proceeds, 0);
-        assertEq(registrar.refundCredits(alice), deposit);
-        assertEq(registrar.totalRefundCredits(), deposit);
-        assertEq(registrar.treasuryCredit(), 0);
-        assertTrue(registrar.getCommitment(aliceId).valid);
-        assertTrue(registrar.getCommitment(aliceId).settled);
+	function _commit(uint256 roundId, address bidder, string memory label, uint256 amount) internal returns (uint256) {
+		bytes32 digest = registrar.computeCommitment(roundId, bidder, label, amount, salt);
+		vm.prank(bidder);
+		registrar.commitBid{value: deposit}(roundId, digest);
+		return registrar.getCommitmentId(roundId, bidder);
+	}
 
-        _assertAccounting();
-    }
+	function _settle(address bidder) internal {
+		vm.prank(bidder);
+		registrar.settleBid(1);
+	}
 
-    function test_RejectedRevealRemainsUnrevealedAtSettlement() public {
-        vm.warp(registrar.getRound(1).startTime + 240);
+	function _end() internal {
+		vm.warp(registrar.getRound(1).revealEnd);
+	}
 
-        (uint256 refund, uint256 proceeds) = registrar.settleCommit(invalidId);
-
-		// This step changes reveal validation. Non-reveal economics are updated next.
-        assertEq(refund, 0);
-        assertEq(proceeds, deposit);
-        assertEq(registrar.refundCredits(carol), 0);
-        assertEq(registrar.treasuryCredit(), deposit);
-
-        DomainRegistrar.CommitmentInfo memory info = registrar.getCommitment(invalidId);
-
-        assertFalse(info.revealed);
-        assertFalse(info.valid);
-        assertTrue(info.settled);
-
-        _assertAccounting();
-    }
-
-    function test_UnrevealedDepositBecomesTreasuryCredit() public {
-        vm.warp(registrar.getRound(1).startTime + 240);
-
-        vm.prank(outsider);
-        (uint256 refund, uint256 proceeds) = registrar.settleCommit(unrevealedId);
-
-        assertEq(refund, 0);
-        assertEq(proceeds, deposit);
-        assertEq(registrar.refundCredits(dave), 0);
-        assertEq(registrar.refundCredits(outsider), 0);
-        assertEq(registrar.totalRefundCredits(), 0);
-        assertEq(registrar.treasuryCredit(), deposit);
-        assertEq(registrar.treasury(), address(this));
-        assertTrue(registrar.getCommitment(unrevealedId).settled);
-        assertFalse(registrar.getCommitment(unrevealedId).revealed);
-
-        _assertAccounting();
-    }
-
-    function test_RejectsUnknownAndRepeatedSettlement() public {
-        vm.warp(registrar.getRound(1).startTime + 240);
-
-        uint256 unknownId = registrar.commitmentCount() + 1;
-
-        vm.expectRevert(bytes("INVALID COMMITMENT"));
-        registrar.settleCommit(0);
-
-        vm.expectRevert(bytes("INVALID COMMITMENT"));
-        registrar.settleCommit(unknownId);
-
-        registrar.settleCommit(bobId);
-
-        vm.expectRevert(bytes("ALREADY SETTLED"));
-        registrar.settleCommit(bobId);
-
-        assertEq(registrar.refundCredits(bob), 0.004 ether);
-        assertEq(registrar.treasuryCredit(), 0.006 ether);
-        assertEq(registrar.totalLockedDeposits(), 3 * deposit);
-
-        _assertAccounting();
-    }
-
-    function test_CanSettleBeforeFinalizing() public {
-        vm.warp(registrar.getRound(1).startTime + 240);
-
-        registrar.settleCommit(bobId);
-        assertEq(registrar.resolve("alice"), address(0));
-
-        registrar.finalizeName("alice");
-
-        assertEq(registrar.resolve("alice"), bob);
-        assertEq(registrar.refundCredits(bob), 0.004 ether);
-        assertEq(registrar.treasuryCredit(), 0.006 ether);
-
-        _assertAccounting();
-    }
-
-    function test_CanSettleAfterFinalizing() public {
-        vm.warp(registrar.getRound(1).startTime + 240);
-
-        registrar.finalizeName("alice");
-        registrar.settleCommit(bobId);
-
-        assertEq(registrar.resolve("alice"), bob);
-        assertEq(registrar.refundCredits(bob), 0.004 ether);
-        assertEq(registrar.treasuryCredit(), 0.006 ether);
-
-        _assertAccounting();
-    }
-
-    function test_AllDepositsRemainAccountedForInLaterRound() public {
-        // Explicitly start rounds 2-5 while the original round's work remains pending.
-        for (uint256 i = 0; i < 4; ++i) {
-            uint256 deadline = registrar.getRound(registrar.getCurrentRound()).revealEnd;
-            vm.warp(deadline);
-            registrar.startRound();
-        }
-        vm.warp(registrar.getRound(1).startTime + 977);
-
-        assertEq(registrar.getCurrentRound(), 5);
-
-        registrar.settleCommit(unrevealedId);
-        registrar.settleCommit(invalidId);
-        registrar.settleCommit(aliceId);
-        registrar.settleCommit(bobId);
-
-        assertEq(registrar.totalLockedDeposits(), 0);
-        assertEq(registrar.refundCredits(alice), deposit);
-        assertEq(registrar.refundCredits(bob), 0.004 ether);
-        assertEq(registrar.refundCredits(carol), 0);
-        assertEq(registrar.refundCredits(dave), 0);
-
-        assertEq(registrar.totalRefundCredits(),deposit + 0.004 ether);
-        assertEq(registrar.treasuryCredit(),2 * deposit + 0.006 ether);
-        assertEq(address(registrar).balance, 4 * deposit);
-
-        _assertAccounting();
-    }
-
-    function _commitBid(address bidder,string memory label,uint256 amount) internal returns (uint256) {
-        bytes32 digest = registrar.computeCommitment(1,bidder,label,amount,salt);
-        vm.prank(bidder);
-        return registrar.commit{value: deposit}(1, digest);
-    }
-
-    function _assertAccounting() internal view {
-        uint256 accountedFor = registrar.totalLockedDeposits() + registrar.totalRefundCredits() + registrar.treasuryCredit();
-        assertEq(address(registrar).balance, accountedFor);
-    }
+	function _assertAccounting() internal view {
+		assertEq(address(registrar).balance, registrar.totalLockedDeposits() + registrar.totalWithdrawalCredits());
+	}
 }

@@ -7,7 +7,7 @@ const { ethers, networkHelpers } = await network.create();
 describe("DomainRegistrar explicit rounds", function () {
 	it("waits for an explicit start and emits the recorded schedule", async function () {
 		const [, starter] = await ethers.getSigners();
-		const registrar = await ethers.deployContract("DomainRegistrar");
+		const registrar = await ethers.deployContract("DomainRegistrar", [(await ethers.getSigners())[0].address]);
 		await registrar.waitForDeployment();
 
 		await networkHelpers.time.increase(777);
@@ -30,7 +30,7 @@ describe("DomainRegistrar explicit rounds", function () {
 
 	it("rejects overlapping starts and leaves ended rounds recorded", async function () {
 		const [, starter] = await ethers.getSigners();
-		const registrar = await ethers.deployContract("DomainRegistrar");
+		const registrar = await ethers.deployContract("DomainRegistrar", [(await ethers.getSigners())[0].address]);
 		await registrar.waitForDeployment();
 		const firstStart = await registrar.startRound();
 		await firstStart.wait();
@@ -57,7 +57,7 @@ describe("DomainRegistrar explicit rounds", function () {
 
 	it("finalizes and settles an older auction while a newer round accepts bids", async function () {
 		const [winner, laterBidder, starter] = await ethers.getSigners();
-		const registrar = await ethers.deployContract("DomainRegistrar");
+		const registrar = await ethers.deployContract("DomainRegistrar", [(await ethers.getSigners())[0].address]);
 		await registrar.waitForDeployment();
 		const firstStart = await registrar.startRound();
 		await firstStart.wait();
@@ -87,7 +87,7 @@ describe("DomainRegistrar explicit rounds", function () {
 
 		const finalization = await registrar.connect(starter).finalizeName("alice");
 		await finalization.wait();
-		const settlement = await registrar.connect(starter).settleCommit(1n);
+		const settlement = await registrar.connect(winner).settleBid(1n);
 		await settlement.wait();
 
 		const secondAfter = await registrar.getRound(2n);
@@ -102,8 +102,9 @@ describe("DomainRegistrar explicit rounds", function () {
 		expect(laterRecord.revealed).to.equal(false);
 		expect(laterRecord.settled).to.equal(false);
 		expect(await registrar.totalLockedDeposits()).to.equal(deposit);
-		expect(await registrar.totalRefundCredits()).to.equal(deposit - bid);
-		expect(await registrar.treasuryCredit()).to.equal(bid);
+		expect(await registrar.totalWithdrawalCredits()).to.equal(deposit);
+		// The default deployer is both treasury and winning bidder in this test.
+		expect(await registrar.withdrawalCredits(winner.address)).to.equal(deposit);
 		expect(await ethers.provider.getBalance(await registrar.getAddress())).to.equal(2n * deposit);
 	});
 });

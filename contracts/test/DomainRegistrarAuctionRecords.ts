@@ -6,7 +6,7 @@ const { ethers, networkHelpers } = await network.create();
 
 async function prepareTwoPendingNames() {
 	const [alice, bob, carol, outsider] = await ethers.getSigners();
-	const registrar = await ethers.deployContract("DomainRegistrar");
+	const registrar = await ethers.deployContract("DomainRegistrar", [(await ethers.getSigners())[0].address]);
 	await registrar.waitForDeployment();
 	const start = await registrar.startRound();
 	await start.wait();

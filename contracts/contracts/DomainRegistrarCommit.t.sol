@@ -12,7 +12,7 @@ contract DomainRegistrarCommitTest is Test {
     bytes32         internal digest;
 
     function setUp() public {
-        registrar = new DomainRegistrar();
+        registrar = new DomainRegistrar(address(this));
         registrar.startRound();
         deposit   = registrar.COMMIT_DEPOSIT();
         digest    = keccak256("example commitment");

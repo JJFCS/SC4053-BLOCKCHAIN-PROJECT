@@ -16,7 +16,7 @@ contract DomainRegistrarAuctionTest is Test {
     address internal carol = address(103);
 
     function setUp() public {
-        registrar = new DomainRegistrar();
+        registrar = new DomainRegistrar(address(this));
         registrar.startRound();
         deposit   = registrar.COMMIT_DEPOSIT();
         salt      = bytes32(uint256(123));

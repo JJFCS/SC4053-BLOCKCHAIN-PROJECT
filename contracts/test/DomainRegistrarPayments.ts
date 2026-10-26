@@ -6,7 +6,7 @@ const { ethers, networkHelpers } = await network.create();
 
 async function registerName() {
     const [treasury, owner, payer, recipient] = await ethers.getSigners();
-    const registrar = await ethers.deployContract("DomainRegistrar");
+    const registrar = await ethers.deployContract("DomainRegistrar", [(await ethers.getSigners())[0].address]);
     await registrar.waitForDeployment();
     const startTransaction = await registrar.startRound();
     await startTransaction.wait();
@@ -36,7 +36,7 @@ async function registerName() {
 
 describe("DomainRegistrar payments", function () {
     it("emits the exact payment and preserves the auction deposit", async function () {
-        const { registrar, owner, payer, recipient, label, deposit } = await registerName();
+        const { registrar, treasury, owner, payer, recipient, label, deposit } = await registerName();
         const updateTransaction = await registrar.connect(owner).setAddress(
             label, recipient.address
         );
@@ -55,10 +55,10 @@ describe("DomainRegistrar payments", function () {
         expect(await ethers.provider.getBalance(recipient.address)).to.equal(recipientBefore + amount);
         expect(await ethers.provider.getBalance(registrarAddress)).to.equal(registrarBefore);
         expect(registrarBefore).to.equal(deposit);
-        expect(await registrar.totalLockedDeposits()).to.equal(deposit);
-        expect(await registrar.totalRefundCredits()).to.equal(0n);
-        expect(await registrar.treasuryCredit()).to.equal(0n);
-        expect(await registrar.refundCredits(payer.address)).to.equal(0n);
+        expect(await registrar.totalLockedDeposits()).to.equal(deposit - ethers.parseEther("0.006"));
+        expect(await registrar.totalWithdrawalCredits()).to.equal(ethers.parseEther("0.006"));
+        expect(await registrar.withdrawalCredits(treasury.address)).to.equal(ethers.parseEther("0.006"));
+        expect(await registrar.withdrawalCredits(payer.address)).to.equal(0n);
         expect(await registrar.ownerOf(label)).to.equal(owner.address);
     });
 

@@ -15,7 +15,7 @@ contract DomainRegistrarAuctionRecordsTest is Test {
 	address internal outsider = address(105);
 
 	function setUp() public {
-		registrar = new DomainRegistrar();
+		registrar = new DomainRegistrar(address(this));
 		registrar.startRound();
 		deposit = registrar.COMMIT_DEPOSIT();
 		salt = bytes32(uint256(123)); // Fixed salt for local tests only.
@@ -261,6 +261,7 @@ contract DomainRegistrarAuctionRecordsTest is Test {
 		_toReveal(1);
 		assertTrue(_reveal(validId, alice, "alice", 0.004 ether));
 		_endRound(1);
+		vm.prank(bob);
 		registrar.settleCommit(unopenedId);
 
 		assertEq(_pending(1), 1);
@@ -283,11 +284,13 @@ contract DomainRegistrarAuctionRecordsTest is Test {
 		assertTrue(_reveal(laterId, carol, "bob", 0.005 ether));
 
 		registrar.finalizeDomain(1, "alice");
+		vm.prank(alice);
 		registrar.settleCommit(winningId);
+		vm.prank(bob);
 		registrar.settleCommit(losingId);
-		assertEq(registrar.refundCredits(alice), deposit - 0.006 ether);
-		assertEq(registrar.refundCredits(bob), deposit);
-		assertEq(registrar.treasuryCredit(), 0.006 ether);
+		assertEq(registrar.withdrawalCredits(alice), deposit - 0.006 ether);
+		assertEq(registrar.withdrawalCredits(bob), deposit);
+		assertEq(registrar.withdrawalCredits(registrar.treasury()), 0.006 ether);
 		assertEq(registrar.totalLockedDeposits(), deposit);
 		assertEq(_pending(1), 0);
 		assertEq(_pending(2), 1);
