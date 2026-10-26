@@ -22,6 +22,7 @@ contract DomainRegistrar {
         uint256 commitEnd;
         uint256 revealEnd;
         Phase   phase;
+		uint256 pendingDomainCount;
     }
 
 	// These timestamps are stored when a round is explicitly started.
@@ -30,6 +31,7 @@ contract DomainRegistrar {
 		uint256 startTime;
 		uint256 commitEnd;
 		uint256 revealEnd;
+		uint256 pendingDomainCount;
 	}
 
     struct CommitmentInfo {
@@ -49,6 +51,7 @@ contract DomainRegistrar {
         uint256 winningCommitmentId;  // this is tracking which bid is currently in the lead
         address highestBidder;
         uint256 highestBidWei;
+		bool finalized;
     }
 
     struct DomainInfo {
@@ -77,7 +80,8 @@ contract DomainRegistrar {
 
     mapping(uint256 => CommitmentInfo) private _commitments;
     mapping(bytes32 => bool)           private _usedCommitments;
-    mapping(bytes32 => AuctionInfo)    private _auctions;
+	mapping(uint256 => mapping(bytes32 => AuctionInfo)) private _auctions;
+	mapping(bytes32 => uint256) private _reservedRounds;
     mapping(bytes32 => DomainInfo)     private _domains;
     mapping(address => uint256)        public refundCredits;
 
@@ -164,7 +168,12 @@ contract DomainRegistrar {
 		uint256 commitEnd = startTime + COMMIT_DURATION;
 		uint256 revealEnd = commitEnd + REVEAL_DURATION;
 
-		_rounds[roundId] = RoundSchedule(startTime, commitEnd, revealEnd);
+		_rounds[roundId] = RoundSchedule({
+			startTime: startTime,
+			commitEnd: commitEnd,
+			revealEnd: revealEnd,
+			pendingDomainCount: 0
+		});
 		_latestRoundId = roundId;
 
 		emit RoundStarted(roundId, msg.sender, startTime, commitEnd, revealEnd);
@@ -224,16 +233,19 @@ contract DomainRegistrar {
         info.labelHash = keccak256(bytes(label));
         info.bidWei    = bidWei;
 
-        AuctionInfo storage auction = _auctions[info.labelHash];
-
-        valid = isValidLabel(label) && bidWei > 0 && bidWei <= info.deposit &&
-            (auction.roundId == 0 || auction.roundId == info.roundId);
+		uint256 reservation = _reservedRounds[info.labelHash];
+		valid = isValidLabel(label) && bidWei > 0 && bidWei <= info.deposit &&
+			_domains[info.labelHash].owner == address(0) &&
+			(reservation == 0 || reservation == info.roundId);
         info.valid = valid;
 
         if (valid) {
-            if (auction.roundId == 0) {
-                auction.roundId = info.roundId;
-            }
+			AuctionInfo storage auction = _auctions[info.roundId][info.labelHash];
+			if (auction.winningCommitmentId == 0) {
+				auction.roundId = info.roundId;
+				_reservedRounds[info.labelHash] = info.roundId;
+				_rounds[info.roundId].pendingDomainCount += 1;
+			}
 
             // so this checks the first bid , the higher bidder , and also if there is
             // an earlier bid but with a earlier commitment ID
@@ -291,7 +303,7 @@ contract DomainRegistrar {
         } else if (!info.valid) {
             refundWei   = info.deposit;
         } else {
-            AuctionInfo storage auction = _auctions[info.labelHash];
+			AuctionInfo storage auction = _auctions[info.roundId][info.labelHash];
             if (auction.winningCommitmentId == commitmentId) {
                 proceedsWei = info.bidWei;
                 refundWei   = info.deposit - info.bidWei;
@@ -314,24 +326,44 @@ contract DomainRegistrar {
 
     function finalizeName(string memory label) external returns (address owner) {
         require(isValidLabel(label), "INVALID LABEL");
-
         bytes32 labelHash = keccak256(bytes(label));
-        AuctionInfo storage auction = _auctions[labelHash];
+		uint256 roundId = _reservedRounds[labelHash];
+		if (roundId == 0) {
+			roundId = _domains[labelHash].roundId;
+		}
+		require(roundId != 0, "NO WINNING BID");
+		return _finalizeDomain(roundId, labelHash, label);
+	}
 
-        require(auction.winningCommitmentId != 0,"NO WINNING BID");
-        require(getRound(auction.roundId).phase == Phase.Ended,"ROUND NOT ENDED");
+	function finalizeDomain(uint256 roundId, string memory label) external returns (address owner) {
+		require(isValidLabel(label), "INVALID LABEL");
+		return _finalizeDomain(roundId, keccak256(bytes(label)), label);
+	}
 
-        DomainInfo storage domain = _domains[labelHash];
+	function _finalizeDomain(
+		uint256 roundId,
+		bytes32 labelHash,
+		string memory label
+	) internal returns (address owner) {
+		RoundInfo memory round = getRound(roundId);
+		AuctionInfo storage auction = _auctions[roundId][labelHash];
+		DomainInfo storage domain = _domains[labelHash];
 
-        require(domain.owner == address(0), "ALREADY FINALIZED");
+		require(auction.winningCommitmentId != 0, "NO WINNING BID");
+		require(!auction.finalized && domain.owner == address(0), "ALREADY FINALIZED");
+		require(round.phase == Phase.Ended, "ROUND NOT ENDED");
+		require(_reservedRounds[labelHash] == roundId, "WRONG RESERVATION");
 
-        owner = auction.highestBidder;  // this will use the winning bidder regardless of who calls the finalizeName()
+		owner = auction.highestBidder;
 
         domain.owner = owner;
-        domain.roundId = auction.roundId;
+		domain.roundId = roundId;
         domain.winningCommitmentId = auction.winningCommitmentId;
         domain.priceWei = auction.highestBidWei;
         domain.resolutionAddress = owner;
+		auction.finalized = true;
+		delete _reservedRounds[labelHash];
+		_rounds[roundId].pendingDomainCount -= 1;
 
         emit DomainFinalized(
             labelHash,
@@ -358,11 +390,7 @@ contract DomainRegistrar {
 
     function reservedRound(string memory label) public view returns (uint256) {
         require(isValidLabel(label), "INVALID LABEL");
-        bytes32 labelHash   = keccak256(bytes(label));
-        if (_domains[labelHash].owner != address(0)) {
-            return 0;
-        }
-        return _auctions[labelHash].roundId;
+		return _reservedRounds[keccak256(bytes(label))];
     }
 
     function resolve(string memory label) public view returns (address) {
@@ -408,10 +436,20 @@ contract DomainRegistrar {
     }
 
     function getAuction(string memory label) public view returns (AuctionInfo memory) {
-        // so we can eventually call something like getAuction("alice") to display our leading bid
-        // note that an unknown name returns a record containing zero values
-        return _auctions[keccak256(bytes(label))];
+		// Label-only access resolves the active reservation or registered history.
+		bytes32 labelHash = keccak256(bytes(label));
+		uint256 roundId = _reservedRounds[labelHash];
+		if (roundId == 0) {
+			roundId = _domains[labelHash].roundId;
+		}
+		return _auctions[roundId][labelHash];
     }
+
+	function getAuctionForRound(uint256 roundId, string memory label) public view returns (AuctionInfo memory) {
+		require(roundId > 0 && roundId <= _latestRoundId, "INVALID ROUND");
+		require(isValidLabel(label), "INVALID LABEL");
+		return _auctions[roundId][keccak256(bytes(label))];
+	}
 
     function getCommitment(uint256 commitmentId) public view returns (CommitmentInfo memory) {
         require(commitmentId > 0 && commitmentId <= commitmentCount, "INVALID COMMITMENT");
@@ -430,6 +468,7 @@ contract DomainRegistrar {
 		info.startTime = schedule.startTime;
 		info.commitEnd = schedule.commitEnd;
 		info.revealEnd = schedule.revealEnd;
+		info.pendingDomainCount = schedule.pendingDomainCount;
 
         if (block.timestamp < info.startTime) {
             info.phase = Phase.NotStarted;
