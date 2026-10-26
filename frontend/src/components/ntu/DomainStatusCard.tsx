@@ -3,6 +3,7 @@ import {
   Clock3,
   Gavel,
   Search,
+  Trophy,
   User,
 } from "lucide-react"
 
@@ -17,11 +18,24 @@ import {
   type DomainInfo,
 } from "./handlers"
 
+import {
+  Button,
+} from "./primitives"
+
 export function DomainStatusCard({
   domain,
+  finalizing,
+  onFinalize,
   onPhaseExpired,
 }: {
   domain: DomainInfo | null
+
+  finalizing: boolean
+
+  onFinalize: (
+    name: string
+  ) => void
+
   onPhaseExpired?: () => void
 }) {
   const [
@@ -30,46 +44,54 @@ export function DomainStatusCard({
   ] = useState("—")
 
   /*
+    ========================================================
     LIVE COUNTDOWN
+    ========================================================
 
-    We don't query Ethereum every second.
+    The contract gives us the exact timestamp when the
+    current phase ends.
 
-    Instead:
-    - contract gives us phaseEndsAt once
-    - browser counts down locally
-    - when countdown reaches zero,
-      we ask NtuApp to refresh contract state
+    We count down locally instead of querying Ethereum
+    every second.
+
+    When the timer reaches zero, NtuApp refreshes the
+    domain state from the contract.
   */
+
   useEffect(() => {
     if (
       !domain?.phaseEndsAt
     ) {
       setTimeLeft("—")
+
       return
     }
 
-    let expired = false
+    let expired =
+      false
 
-    const updateTimer = () => {
-      const remaining =
-        domain.phaseEndsAt! -
-        Date.now()
+    const updateTimer =
+      () => {
+        const remaining =
+          domain.phaseEndsAt! -
+          Date.now()
 
-      setTimeLeft(
-        formatTimeLeft(
-          domain.phaseEndsAt
+        setTimeLeft(
+          formatTimeLeft(
+            domain.phaseEndsAt
+          )
         )
-      )
 
-      if (
-        remaining <= 0 &&
-        !expired
-      ) {
-        expired = true
+        if (
+          remaining <= 0 &&
+          !expired
+        ) {
+          expired =
+            true
 
-        onPhaseExpired?.()
+          onPhaseExpired?.()
+        }
       }
-    }
 
     updateTimer()
 
@@ -90,13 +112,16 @@ export function DomainStatusCard({
   ])
 
   /*
-    BEFORE USER SEARCHES
+    ========================================================
+    NOTHING SEARCHED YET
+    ========================================================
   */
+
   if (!domain) {
     return (
-      <section className="rounded-2xl border border-zinc-200 bg-white p-6">
+      <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
         <div className="flex items-start gap-3">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-zinc-100">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-zinc-100">
             <Search className="size-4 text-zinc-500" />
           </div>
 
@@ -106,7 +131,7 @@ export function DomainStatusCard({
             </p>
 
             <p className="mt-1 text-sm text-zinc-500">
-              Domain availability and auction status will appear here.
+              Domain ownership and auction information will appear here.
             </p>
           </div>
         </div>
@@ -115,18 +140,21 @@ export function DomainStatusCard({
   }
 
   /*
+    ========================================================
     REGISTERED DOMAIN
+    ========================================================
   */
+
   if (
     domain.status ===
     "registered"
   ) {
     return (
-      <section className="rounded-2xl border border-zinc-200 bg-white p-6">
+      <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="size-5 text-[#0047AB]" />
+              <CheckCircle2 className="size-5 text-emerald-600" />
 
               <h2 className="text-lg font-semibold text-zinc-900">
                 {domain.name}
@@ -137,7 +165,7 @@ export function DomainStatusCard({
             </div>
 
             <p className="mt-1 text-sm text-zinc-500">
-              This name is registered.
+              This domain has been finalized and registered.
             </p>
           </div>
 
@@ -160,10 +188,106 @@ export function DomainStatusCard({
           />
 
           <InfoItem
-            label="Round won"
+            label="Resolves to"
+            value={
+              domain.resolutionAddress
+                ? shortenHex(
+                    domain.resolutionAddress,
+                    6
+                  )
+                : "—"
+            }
+          />
+
+          <InfoItem
+            label="Winning bid"
+            value={
+              domain.highestBid
+                ? `${domain.highestBid} ETH`
+                : "—"
+            }
+          />
+
+          <InfoItem
+            label="Round"
             value={
               domain.roundId ??
               "—"
+            }
+          />
+        </div>
+
+        {domain.winningCommitmentId && (
+          <div className="mt-4 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+            Winning commitment{" "}
+            <span className="font-mono font-medium text-zinc-900">
+              #
+              {
+                domain.winningCommitmentId
+              }
+            </span>
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  /*
+    ========================================================
+    AUCTION ENDED — READY TO FINALIZE
+    ========================================================
+
+    The name is reserved and has a winning bidder,
+    but finalizeName() has not been called yet.
+  */
+
+  if (
+    domain.status ===
+    "ended"
+  ) {
+    return (
+      <section className="rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Trophy className="size-5 text-amber-600" />
+
+              <h2 className="text-lg font-semibold text-zinc-900">
+                {domain.name}
+                <span className="text-[#0047AB]">
+                  .ntu
+                </span>
+              </h2>
+            </div>
+
+            <p className="mt-1 text-sm text-zinc-500">
+              The auction has ended. The winning bid is ready to be finalized.
+            </p>
+          </div>
+
+          <StatusBadge
+            status="Ready to finalize"
+          />
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <InfoItem
+            label="Round"
+            value={
+              domain.roundId ??
+              "—"
+            }
+          />
+
+          <InfoItem
+            label="Winning bidder"
+            value={
+              domain.highestBidder
+                ? shortenHex(
+                    domain.highestBidder,
+                    6
+                  )
+                : "—"
             }
           />
 
@@ -179,17 +303,52 @@ export function DomainStatusCard({
           <InfoItem
             label="Commitment"
             value={
-              domain.winningCommitmentId ??
-              "—"
+              domain.winningCommitmentId
+                ? `#${domain.winningCommitmentId}`
+                : "—"
             }
           />
         </div>
+
+        <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-medium text-amber-900">
+            Finalization is required
+          </p>
+
+          <p className="mt-1 text-sm text-amber-700">
+            Anyone may submit the finalization transaction. Ownership will still be assigned to the highest bidder.
+          </p>
+        </div>
+
+        <Button
+          variant="primary"
+          className="mt-4 h-11 w-full"
+          loading={
+            finalizing
+          }
+          disabled={
+            finalizing
+          }
+          onClick={() =>
+            onFinalize(
+              domain.name
+            )
+          }
+        >
+          <Trophy className="mr-2 size-4" />
+
+          Finalize{" "}
+          {domain.name}
+          .ntu
+        </Button>
       </section>
     )
   }
 
   /*
-    COMMIT / REVEAL / AVAILABLE
+    ========================================================
+    ACTIVE AUCTION / AVAILABLE
+    ========================================================
   */
 
   const isCommit =
@@ -200,8 +359,12 @@ export function DomainStatusCard({
     domain.status ===
     "reveal"
 
+  const isAvailable =
+    domain.status ===
+    "available"
+
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-6">
+    <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -223,10 +386,10 @@ export function DomainStatusCard({
 
           <p className="mt-1 text-sm text-zinc-500">
             {isCommit
-              ? "Sealed bids can be submitted during the commit phase."
+              ? "The current auction is accepting sealed commitments."
               : isReveal
-                ? "Committed bids can now be revealed."
-                : "This name is currently available."}
+                ? "The reveal phase is active. Existing bidders can reveal their bids."
+                : "This name is not currently registered or reserved."}
           </p>
         </div>
 
@@ -282,11 +445,25 @@ export function DomainStatusCard({
       </div>
 
       {isReveal &&
-        domain.winningCommitmentId && (
+        domain.highestBidder && (
           <div className="mt-4 flex items-center gap-2 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
             <User className="size-4" />
 
-            Current leading commitment:
+            Current highest bidder:
+
+            <span className="font-mono font-medium text-zinc-900">
+              {shortenHex(
+                domain.highestBidder,
+                6
+              )}
+            </span>
+          </div>
+        )}
+
+      {isReveal &&
+        domain.winningCommitmentId && (
+          <div className="mt-2 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+            Leading commitment:{" "}
             <span className="font-mono font-medium text-zinc-900">
               #
               {
@@ -295,9 +472,21 @@ export function DomainStatusCard({
             </span>
           </div>
         )}
+
+      {isAvailable && (
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          This name can be bid on when an auction round enters its commit phase.
+        </div>
+      )}
     </section>
   )
 }
+
+/*
+  ============================================================
+  SMALL DISPLAY COMPONENTS
+  ============================================================
+*/
 
 function InfoItem({
   label,
@@ -312,7 +501,7 @@ function InfoItem({
         {label}
       </p>
 
-      <p className="mt-1 font-mono text-sm font-medium text-zinc-900">
+      <p className="mt-1 break-all font-mono text-sm font-medium text-zinc-900">
         {value}
       </p>
     </div>
@@ -338,6 +527,14 @@ function StatusBadge({
   if (
     status ===
     "Reveal phase"
+  ) {
+    styles =
+      "border-amber-200 bg-amber-50 text-amber-700"
+  }
+
+  if (
+    status ===
+    "Ready to finalize"
   ) {
     styles =
       "border-amber-200 bg-amber-50 text-amber-700"

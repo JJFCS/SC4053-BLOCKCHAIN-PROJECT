@@ -59,7 +59,8 @@ export function RevealSection({
             accept=".json,application/json"
             className="hidden"
             onChange={(event) => {
-              const file = event.target.files?.[0]
+              const file =
+                event.target.files?.[0]
 
               if (file) {
                 onImportBackup(file)
@@ -119,6 +120,12 @@ export function RevealSection({
 
                   <CommitmentBadge
                     revealed={c.revealed}
+                    settled={
+                      !!c.settled
+                    }
+                    valid={
+                      c.valid
+                    }
                     ready={
                       inReveal &&
                       correctWallet
@@ -153,7 +160,18 @@ export function RevealSection({
                   </dt>
 
                   <dd className="text-right font-mono text-zinc-800">
-                    {c.roundId ?? "—"}
+                    {c.roundId ??
+                      "—"}
+                  </dd>
+
+                  <dt className="text-zinc-500">
+                    Commitment ID
+                  </dt>
+
+                  <dd className="text-right font-mono text-zinc-800">
+                    {c.commitmentId
+                      ? `#${c.commitmentId}`
+                      : "—"}
                   </dd>
 
                   <dt className="text-zinc-500">
@@ -189,36 +207,37 @@ export function RevealSection({
                   </dd>
                 </dl>
 
-                {!c.revealed && (
-                  <Button
-                    variant={
-                      inReveal &&
-                      correctWallet
-                        ? "primary"
-                        : "secondary"
-                    }
-                    className="mt-4 h-10 w-full"
-                    disabled={
-                      !inReveal ||
-                      !correctWallet
-                    }
-                    loading={
-                      revealingHash ===
-                      c.hash
-                    }
-                    onClick={() =>
-                      onReveal(c)
-                    }
-                  >
-                    {!account
-                      ? "Connect wallet to reveal"
-                      : !correctWallet
-                        ? "Switch to original wallet"
-                        : inReveal
-                          ? "Reveal bid"
-                          : "Available in reveal phase"}
-                  </Button>
-                )}
+                {!c.revealed &&
+                  !c.settled && (
+                    <Button
+                      variant={
+                        inReveal &&
+                        correctWallet
+                          ? "primary"
+                          : "secondary"
+                      }
+                      className="mt-4 h-10 w-full"
+                      disabled={
+                        !inReveal ||
+                        !correctWallet
+                      }
+                      loading={
+                        revealingHash ===
+                        c.hash
+                      }
+                      onClick={() =>
+                        onReveal(c)
+                      }
+                    >
+                      {!account
+                        ? "Connect wallet to reveal"
+                        : !correctWallet
+                          ? "Switch to original wallet"
+                          : inReveal
+                            ? "Reveal bid"
+                            : "Available in reveal phase"}
+                    </Button>
+                  )}
               </li>
             )
           })}
@@ -236,11 +255,38 @@ export function RevealSection({
 
 function CommitmentBadge({
   revealed,
+  settled,
+  valid,
   ready,
 }: {
   revealed: boolean
+  settled: boolean
+  valid?: boolean
   ready: boolean
 }) {
+  if (settled) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs text-emerald-700">
+        <CheckCircle2
+          className="size-3"
+          aria-hidden="true"
+        />
+        Settled
+      </span>
+    )
+  }
+
+  if (
+    revealed &&
+    valid === false
+  ) {
+    return (
+      <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs text-red-700">
+        Invalid reveal
+      </span>
+    )
+  }
+
   if (revealed) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs text-[#0047AB]">

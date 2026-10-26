@@ -1,12 +1,16 @@
 import {
+  useCallback,
   useEffect,
   useState,
-  useCallback,
 } from "react"
 
 import {
   Navbar,
 } from "./Navbar"
+
+import {
+  RoundSection,
+} from "./RoundSection"
 
 import {
   DomainSearch,
@@ -25,6 +29,16 @@ import {
 } from "./RevealSection"
 
 import {
+  SettlementSection,
+  type SettlementResult,
+  type WithdrawalResult,
+} from "./SettlementSection"
+
+import {
+  ResolutionSection,
+} from "./ResolutionSection"
+
+import {
   PaymentSection,
 } from "./PaymentSection"
 
@@ -33,104 +47,207 @@ import {
   commitBid,
   connectWallet,
   disconnectWallet,
+  finalizeDomain,
+  getCurrentRoundState,
+  getFriendlyError,
+  getWithdrawalCredit,
   revealBid,
   sendPayment,
+  setResolutionAddress,
+  settleCommitment,
+  startAuctionRound,
+  withdrawCredit,
   type Commitment,
   type DomainInfo,
+  type RoundState,
 } from "./handlers"
 
 export default function NtuApp() {
+  /*
+    ========================================================
+    WALLET STATE
+    ========================================================
+  */
+
   const [
     account,
     setAccount,
-  ] =
-    useState<
-      string | null
-    >(null)
+  ] = useState<string | null>(
+    null
+  )
 
   const [
     connecting,
     setConnecting,
-  ] =
-    useState(false)
+  ] = useState(false)
+
+  /*
+    ========================================================
+    ROUND STATE
+    ========================================================
+  */
+
+  const [
+    round,
+    setRound,
+  ] = useState<RoundState | null>(
+    null
+  )
+
+  const [
+    loadingRound,
+    setLoadingRound,
+  ] = useState(false)
+
+  const [
+    startingRound,
+    setStartingRound,
+  ] = useState(false)
+
+  /*
+    ========================================================
+    DOMAIN STATE
+    ========================================================
+  */
 
   const [
     domain,
     setDomain,
-  ] =
-    useState<
-      DomainInfo | null
-    >(null)
+  ] = useState<DomainInfo | null>(
+    null
+  )
 
   const [
     searching,
     setSearching,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   const [
     committing,
     setCommitting,
-  ] =
-    useState(false)
+  ] = useState(false)
+
+  const [
+    finalizing,
+    setFinalizing,
+  ] = useState(false)
 
   /*
-    Load reveal recovery data.
+    ========================================================
+    SAVED COMMITMENTS / REVEAL RECOVERY
+    ========================================================
   */
+
   const [
     commitments,
     setCommitments,
-  ] =
-    useState<
-      Commitment[]
-    >(() => {
-      try {
-        const saved =
-          localStorage.getItem(
-            "ntu-commitments"
-          )
-
-        return saved
-          ? JSON.parse(
-              saved
-            )
-          : []
-      } catch (
-        error
-      ) {
-        console.error(
-          "Failed to load commitments:",
-          error
+  ] = useState<Commitment[]>(() => {
+    try {
+      const saved =
+        localStorage.getItem(
+          "ntu-commitments"
         )
 
-        return []
-      }
-    })
+      return saved
+        ? JSON.parse(saved)
+        : []
+    } catch (error) {
+      console.error(
+        "Failed to load commitments:",
+        error
+      )
+
+      return []
+    }
+  })
 
   const [
     revealingHash,
     setRevealingHash,
-  ] =
-    useState<
-      string | null
-    >(null)
+  ] = useState<string | null>(
+    null
+  )
+
+  /*
+    ========================================================
+    SETTLEMENT / WITHDRAWAL STATE
+    ========================================================
+  */
+
+  const [
+    settlingHash,
+    setSettlingHash,
+  ] = useState<string | null>(
+    null
+  )
+
+  const [
+    withdrawalCreditEth,
+    setWithdrawalCreditEth,
+  ] = useState("0")
+
+  const [
+    loadingCredit,
+    setLoadingCredit,
+  ] = useState(false)
+
+  const [
+    withdrawing,
+    setWithdrawing,
+  ] = useState(false)
+
+  const [
+    lastSettlement,
+    setLastSettlement,
+  ] = useState<SettlementResult | null>(
+    null
+  )
+
+  const [
+    lastWithdrawal,
+    setLastWithdrawal,
+  ] = useState<WithdrawalResult | null>(
+    null
+  )
+
+  /*
+    ========================================================
+    RESOLUTION ADDRESS STATE
+    ========================================================
+  */
+
+  const [
+    updatingResolution,
+    setUpdatingResolution,
+  ] = useState(false)
+
+  const [
+    lastResolutionTxHash,
+    setLastResolutionTxHash,
+  ] = useState<string | null>(
+    null
+  )
+
+  /*
+    ========================================================
+    PAYMENT STATE
+    ========================================================
+  */
 
   const [
     sending,
     setSending,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   const [
     lastPayment,
     setLastPayment,
-  ] =
-    useState<{
-      name: string
-      amount: string
-      resolvedAddress: string
-      txHash: string
-    } | null>(null)
+  ] = useState<{
+    name: string
+    amount: string
+    resolvedAddress: string
+    txHash: string
+  } | null>(null)
 
   /*
     ========================================================
@@ -147,22 +264,20 @@ export default function NtuApp() {
     }
 
     const handleAccountsChanged =
-      (
-        accounts:
-          string[]
-      ) => {
+      (accounts: string[]) => {
         if (
-          accounts.length ===
-          0
+          accounts.length === 0
         ) {
-          setAccount(
-            null
-          )
+          setAccount(null)
         } else {
           setAccount(
             accounts[0]
           )
         }
+
+        setLastResolutionTxHash(
+          null
+        )
       }
 
     const handleChainChanged =
@@ -195,7 +310,7 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    SAVE REVEAL DATA
+    SAVE COMMITMENTS TO LOCAL STORAGE
     ========================================================
   */
 
@@ -207,16 +322,197 @@ export default function NtuApp() {
           commitments
         )
       )
-    } catch (
-      error
-    ) {
+    } catch (error) {
       console.error(
         "Failed to save commitments:",
         error
       )
     }
+  }, [commitments])
+
+  /*
+    ========================================================
+    ROUND REFRESH
+    ========================================================
+  */
+
+  const refreshRound =
+    useCallback(
+      async () => {
+        setLoadingRound(
+          true
+        )
+
+        try {
+          const current =
+            await getCurrentRoundState()
+
+          setRound(
+            current
+          )
+        } catch (error) {
+          console.error(
+            "Failed to load round:",
+            error
+          )
+        } finally {
+          setLoadingRound(
+            false
+          )
+        }
+      },
+      []
+    )
+
+  /*
+    Load the current round when the app loads.
+
+    Once the contract is deployed/configured, this will:
+    - return null if no round exists
+    - otherwise show Commit / Reveal / Ended
+  */
+
+  useEffect(() => {
+    void refreshRound()
   }, [
-    commitments,
+    refreshRound,
+  ])
+
+  /*
+    ========================================================
+    START ROUND
+    ========================================================
+  */
+
+  const handleStartRound =
+    async () => {
+      if (!account) {
+        alert(
+          "Connect your wallet before starting a round."
+        )
+
+        return
+      }
+
+      setStartingRound(
+        true
+      )
+
+      try {
+        const result =
+          await startAuctionRound()
+
+        console.log(
+          "Started auction round:",
+          result.roundId
+        )
+
+        await refreshRound()
+
+        /*
+          If the user already searched a domain,
+          refresh it because it may now be in the
+          new round's commit phase.
+        */
+
+        if (domain) {
+          const updated =
+            await checkDomain(
+              domain.name
+            )
+
+          setDomain(
+            updated
+          )
+        }
+      } catch (error) {
+        console.error(
+          "Failed to start round:",
+          error
+        )
+
+        alert(
+          getFriendlyError(
+            error
+          )
+        )
+      } finally {
+        setStartingRound(
+          false
+        )
+      }
+    }
+
+  /*
+    ========================================================
+    WITHDRAWAL CREDIT
+    ========================================================
+  */
+
+  const refreshWithdrawalCredit =
+    useCallback(
+      async (
+        wallet?: string
+      ) => {
+        const target =
+          wallet ??
+          account
+
+        if (!target) {
+          setWithdrawalCreditEth(
+            "0"
+          )
+
+          return
+        }
+
+        setLoadingCredit(
+          true
+        )
+
+        try {
+          const credit =
+            await getWithdrawalCredit(
+              target
+            )
+
+          setWithdrawalCreditEth(
+            credit.eth
+          )
+        } catch (error) {
+          console.error(
+            "Failed to read withdrawal credit:",
+            error
+          )
+        } finally {
+          setLoadingCredit(
+            false
+          )
+        }
+      },
+      [account]
+    )
+
+  /*
+    Whenever the connected wallet changes,
+    load that wallet's withdrawal credit.
+  */
+
+  useEffect(() => {
+    if (!account) {
+      setWithdrawalCreditEth(
+        "0"
+      )
+
+      return
+    }
+
+    void refreshWithdrawalCredit(
+      account
+    )
+  }, [
+    account,
+    refreshWithdrawalCredit,
   ])
 
   /*
@@ -238,18 +534,16 @@ export default function NtuApp() {
         setAccount(
           address
         )
-      } catch (
-        error
-      ) {
+      } catch (error) {
         console.error(
+          "Wallet connection failed:",
           error
         )
 
         alert(
-          error instanceof
-            Error
-            ? error.message
-            : "Failed to connect wallet"
+          getFriendlyError(
+            error
+          )
         )
       } finally {
         setConnecting(
@@ -264,6 +558,10 @@ export default function NtuApp() {
 
       setAccount(
         null
+      )
+
+      setWithdrawalCreditEth(
+        "0"
       )
     }
 
@@ -282,6 +580,10 @@ export default function NtuApp() {
           true
         )
 
+        setLastResolutionTxHash(
+          null
+        )
+
         try {
           const result =
             await checkDomain(
@@ -291,19 +593,16 @@ export default function NtuApp() {
           setDomain(
             result
           )
-        } catch (
-          error
-        ) {
+        } catch (error) {
           console.error(
             "Domain search failed:",
             error
           )
 
           alert(
-            error instanceof
-              Error
-              ? error.message
-              : "Failed to search domain"
+            getFriendlyError(
+              error
+            )
           )
         } finally {
           setSearching(
@@ -315,16 +614,15 @@ export default function NtuApp() {
     )
 
   /*
-    Called automatically when the
-    commit/reveal countdown reaches zero.
+    ========================================================
+    REFRESH CURRENT DOMAIN
+    ========================================================
   */
 
-  const handlePhaseExpired =
+  const refreshCurrentDomain =
     useCallback(
       async () => {
-        if (
-          !domain
-        ) {
+        if (!domain) {
           return
         }
 
@@ -337,11 +635,9 @@ export default function NtuApp() {
           setDomain(
             updated
           )
-        } catch (
-          error
-        ) {
+        } catch (error) {
           console.error(
-            "Failed to refresh auction phase:",
+            "Failed to refresh domain:",
             error
           )
         }
@@ -350,8 +646,30 @@ export default function NtuApp() {
     )
 
   /*
+    Called when the domain countdown expires.
+
+    Refresh both:
+    - the searched domain
+    - overall round state
+  */
+
+  const handlePhaseExpired =
+    useCallback(
+      async () => {
+        await Promise.all([
+          refreshCurrentDomain(),
+          refreshRound(),
+        ])
+      },
+      [
+        refreshCurrentDomain,
+        refreshRound,
+      ]
+    )
+
+  /*
     ========================================================
-    COMMIT BID
+    COMMIT
     ========================================================
   */
 
@@ -363,37 +681,9 @@ export default function NtuApp() {
         salt: string
       }
     ) => {
-      if (
-        !account
-      ) {
+      if (!account) {
         alert(
           "Connect your wallet before committing a bid."
-        )
-
-        return
-      }
-
-      /*
-        Frontend duplicate safeguard.
-      */
-
-      const existing =
-        commitments.find(
-          (
-            commitment
-          ) =>
-            commitment.name.toLowerCase() ===
-              params.name.toLowerCase() &&
-            commitment.bidder?.toLowerCase() ===
-              account.toLowerCase() &&
-            !commitment.revealed
-        )
-
-      if (
-        existing
-      ) {
-        alert(
-          `You already have an active commitment for ${params.name}.ntu with this wallet.`
         )
 
         return
@@ -410,18 +700,11 @@ export default function NtuApp() {
           )
 
         setCommitments(
-          (
-            previous
-          ) => [
+          (previous) => [
             commitment,
             ...previous,
           ]
         )
-
-        /*
-          Refresh domain state after
-          successful commit.
-        */
 
         const updated =
           await checkDomain(
@@ -431,19 +714,18 @@ export default function NtuApp() {
         setDomain(
           updated
         )
-      } catch (
-        error
-      ) {
+
+        await refreshRound()
+      } catch (error) {
         console.error(
           "Commit failed:",
           error
         )
 
         alert(
-          error instanceof
-            Error
-            ? error.message
-            : "Failed to commit bid"
+          getFriendlyError(
+            error
+          )
         )
       } finally {
         setCommitting(
@@ -454,7 +736,7 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    REVEAL BID
+    REVEAL
     ========================================================
   */
 
@@ -463,9 +745,7 @@ export default function NtuApp() {
       commitment:
         Commitment
     ) => {
-      if (
-        !account
-      ) {
+      if (!account) {
         alert(
           "Connect your wallet before revealing."
         )
@@ -474,9 +754,8 @@ export default function NtuApp() {
       }
 
       if (
-        commitment.bidder &&
         commitment.bidder.toLowerCase() !==
-          account.toLowerCase()
+        account.toLowerCase()
       ) {
         alert(
           "Switch to the wallet that created this commitment before revealing."
@@ -496,33 +775,21 @@ export default function NtuApp() {
           )
 
         setCommitments(
-          (
-            previous
-          ) =>
+          (previous) =>
             previous.map(
-              (
-                current
-              ) =>
+              (current) =>
                 current.hash ===
                 commitment.hash
                   ? {
                       ...current,
-
                       revealed:
                         true,
-
                       valid:
                         result.valid,
                     }
                   : current
             )
         )
-
-        /*
-          Refresh domain auction info,
-          because the highest bid may
-          have changed after reveal.
-        */
 
         const updated =
           await checkDomain(
@@ -532,19 +799,18 @@ export default function NtuApp() {
         setDomain(
           updated
         )
-      } catch (
-        error
-      ) {
+
+        await refreshRound()
+      } catch (error) {
         console.error(
           "Reveal failed:",
           error
         )
 
         alert(
-          error instanceof
-            Error
-            ? error.message
-            : "Failed to reveal bid"
+          getFriendlyError(
+            error
+          )
         )
       } finally {
         setRevealingHash(
@@ -555,7 +821,295 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    DOWNLOAD BACKUP
+    FINALIZE DOMAIN
+    ========================================================
+  */
+
+  const handleFinalize =
+    async (
+      name: string
+    ) => {
+      if (!account) {
+        alert(
+          "Connect your wallet before finalizing the domain."
+        )
+
+        return
+      }
+
+      setFinalizing(
+        true
+      )
+
+      try {
+        await finalizeDomain(
+          name
+        )
+
+        const updated =
+          await checkDomain(
+            name
+          )
+
+        setDomain(
+          updated
+        )
+
+        await refreshRound()
+      } catch (error) {
+        console.error(
+          "Finalization failed:",
+          error
+        )
+
+        alert(
+          getFriendlyError(
+            error
+          )
+        )
+      } finally {
+        setFinalizing(
+          false
+        )
+      }
+    }
+
+  /*
+    ========================================================
+    SETTLEMENT
+    ========================================================
+  */
+
+  const handleSettle =
+    async (
+      commitment:
+        Commitment
+    ) => {
+      if (!account) {
+        alert(
+          "Connect your wallet before settling."
+        )
+
+        return
+      }
+
+      if (
+        commitment.bidder.toLowerCase() !==
+        account.toLowerCase()
+      ) {
+        alert(
+          "Switch to the wallet that created this commitment."
+        )
+
+        return
+      }
+
+      setSettlingHash(
+        commitment.hash
+      )
+
+      setLastSettlement(
+        null
+      )
+
+      try {
+        const result =
+          await settleCommitment(
+            commitment
+          )
+
+        setCommitments(
+          (previous) =>
+            previous.map(
+              (current) =>
+                current.hash ===
+                commitment.hash
+                  ? {
+                      ...current,
+                      settled:
+                        true,
+                    }
+                  : current
+            )
+        )
+
+        setLastSettlement({
+          name:
+            commitment.name,
+
+          commitmentId:
+            commitment.commitmentId ??
+            "",
+
+          refundEth:
+            result.refundEth,
+
+          proceedsEth:
+            result.proceedsEth,
+
+          txHash:
+            result.txHash,
+        })
+
+        await refreshWithdrawalCredit(
+          account
+        )
+
+        await refreshRound()
+      } catch (error) {
+        console.error(
+          "Settlement failed:",
+          error
+        )
+
+        alert(
+          getFriendlyError(
+            error
+          )
+        )
+      } finally {
+        setSettlingHash(
+          null
+        )
+      }
+    }
+
+  /*
+    ========================================================
+    WITHDRAW
+    ========================================================
+  */
+
+  const handleWithdraw =
+    async () => {
+      if (!account) {
+        alert(
+          "Connect your wallet before withdrawing."
+        )
+
+        return
+      }
+
+      setWithdrawing(
+        true
+      )
+
+      setLastWithdrawal(
+        null
+      )
+
+      try {
+        const result =
+          await withdrawCredit()
+
+        setLastWithdrawal({
+          amountEth:
+            result.amountEth,
+
+          txHash:
+            result.txHash,
+        })
+
+        await refreshWithdrawalCredit(
+          account
+        )
+      } catch (error) {
+        console.error(
+          "Withdrawal failed:",
+          error
+        )
+
+        alert(
+          getFriendlyError(
+            error
+          )
+        )
+      } finally {
+        setWithdrawing(
+          false
+        )
+      }
+    }
+
+  /*
+    ========================================================
+    UPDATE RESOLUTION ADDRESS
+    ========================================================
+  */
+
+  const handleResolutionUpdate =
+    async (
+      name: string,
+      target: string
+    ) => {
+      if (!account) {
+        alert(
+          "Connect your wallet before changing the resolution address."
+        )
+
+        return
+      }
+
+      if (
+        !domain?.owner ||
+        account.toLowerCase() !==
+          domain.owner.toLowerCase()
+      ) {
+        alert(
+          "Only the domain owner can change its resolution address."
+        )
+
+        return
+      }
+
+      setUpdatingResolution(
+        true
+      )
+
+      setLastResolutionTxHash(
+        null
+      )
+
+      try {
+        const result =
+          await setResolutionAddress(
+            name,
+            target
+          )
+
+        setLastResolutionTxHash(
+          result.txHash
+        )
+
+        const updated =
+          await checkDomain(
+            name
+          )
+
+        setDomain(
+          updated
+        )
+      } catch (error) {
+        console.error(
+          "Resolution update failed:",
+          error
+        )
+
+        alert(
+          getFriendlyError(
+            error
+          )
+        )
+      } finally {
+        setUpdatingResolution(
+          false
+        )
+      }
+    }
+
+  /*
+    ========================================================
+    BACKUP DOWNLOAD
     ========================================================
   */
 
@@ -581,9 +1135,7 @@ export default function NtuApp() {
 
       const blob =
         new Blob(
-          [
-            data,
-          ],
+          [data],
           {
             type:
               "application/json",
@@ -623,7 +1175,7 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    IMPORT BACKUP
+    BACKUP IMPORT
     ========================================================
   */
 
@@ -652,9 +1204,13 @@ export default function NtuApp() {
 
         const valid =
           imported.every(
-            (
-              item
-            ) =>
+            (item) =>
+              typeof item.commitmentId ===
+                "string" &&
+              typeof item.roundId ===
+                "string" &&
+              typeof item.bidder ===
+                "string" &&
               typeof item.name ===
                 "string" &&
               typeof item.amount ===
@@ -671,33 +1227,43 @@ export default function NtuApp() {
                 "boolean"
           )
 
-        if (
-          !valid
-        ) {
+        if (!valid) {
           throw new Error(
-            "Backup file contains invalid commitment data."
+            "Backup file contains invalid or incomplete commitment data."
           )
         }
 
+        const normalized:
+          Commitment[] =
+          imported.map(
+            (item) => ({
+              ...item,
+
+              settled:
+                typeof item.settled ===
+                "boolean"
+                  ? item.settled
+                  : false,
+            })
+          )
+
         setCommitments(
-          imported
+          normalized
         )
 
         alert(
           "Reveal backup imported successfully."
         )
-      } catch (
-        error
-      ) {
+      } catch (error) {
         console.error(
+          "Backup import failed:",
           error
         )
 
         alert(
-          error instanceof
-            Error
-            ? error.message
-            : "Failed to import reveal backup."
+          getFriendlyError(
+            error
+          )
         )
       }
     }
@@ -715,9 +1281,7 @@ export default function NtuApp() {
         amount: string
       }
     ) => {
-      if (
-        !account
-      ) {
+      if (!account) {
         alert(
           "Connect your wallet before sending ETH."
         )
@@ -737,22 +1301,18 @@ export default function NtuApp() {
 
         setLastPayment({
           ...params,
-
           ...result,
         })
-      } catch (
-        error
-      ) {
+      } catch (error) {
         console.error(
           "Payment failed:",
           error
         )
 
         alert(
-          error instanceof
-            Error
-            ? error.message
-            : "Failed to send payment"
+          getFriendlyError(
+            error
+          )
         )
       } finally {
         setSending(
@@ -790,6 +1350,27 @@ export default function NtuApp() {
       />
 
       <main className="relative mx-auto flex max-w-6xl flex-col gap-10 px-4 pb-20 pt-14 sm:px-6 sm:pt-20">
+        <RoundSection
+          account={
+            account
+          }
+          round={
+            round
+          }
+          loading={
+            loadingRound
+          }
+          starting={
+            startingRound
+          }
+          onRefresh={
+            refreshRound
+          }
+          onStartRound={
+            handleStartRound
+          }
+        />
+
         <DomainSearch
           loading={
             searching
@@ -802,6 +1383,12 @@ export default function NtuApp() {
         <DomainStatusCard
           domain={
             domain
+          }
+          finalizing={
+            finalizing
+          }
+          onFinalize={
+            handleFinalize
           }
           onPhaseExpired={
             handlePhaseExpired
@@ -848,6 +1435,60 @@ export default function NtuApp() {
             }
           />
         </div>
+
+        <SettlementSection
+          account={
+            account
+          }
+          commitments={
+            commitments
+          }
+          settlingHash={
+            settlingHash
+          }
+          withdrawalCreditEth={
+            withdrawalCreditEth
+          }
+          loadingCredit={
+            loadingCredit
+          }
+          withdrawing={
+            withdrawing
+          }
+          lastSettlement={
+            lastSettlement
+          }
+          lastWithdrawal={
+            lastWithdrawal
+          }
+          onSettle={
+            handleSettle
+          }
+          onRefreshCredit={() =>
+            void refreshWithdrawalCredit()
+          }
+          onWithdraw={
+            handleWithdraw
+          }
+        />
+
+        <ResolutionSection
+          domain={
+            domain
+          }
+          account={
+            account
+          }
+          updating={
+            updatingResolution
+          }
+          lastUpdateTxHash={
+            lastResolutionTxHash
+          }
+          onUpdate={
+            handleResolutionUpdate
+          }
+        />
 
         <PaymentSection
           account={
