@@ -8,7 +8,7 @@ contract DomainRegistrarRoundsTest is Test {
 	DomainRegistrar internal registrar;
 
 	function setUp() public {
-		registrar = new DomainRegistrar();
+		registrar = new DomainRegistrar(address(this));
 		vm.deal(address(this), 10 ether);
 	}
 
@@ -234,6 +234,7 @@ contract DomainRegistrarRoundsTest is Test {
 		assertTrue(registrar.reveal(winningId, "alice", bid, salt));
 		vm.warp(first.revealEnd);
 		registrar.finalizeName("alice");
+		vm.prank(winner);
 		registrar.settleCommit(winningId);
 		registrar.startRound();
 
@@ -241,9 +242,9 @@ contract DomainRegistrarRoundsTest is Test {
 		assertEq(registrar.ownerOf("alice"), winner);
 		assertEq(registrar.resolve("alice"), winner);
 		assertEq(registrar.totalLockedDeposits(), deposit);
-		assertEq(registrar.refundCredits(winner), deposit - bid);
-		assertEq(registrar.totalRefundCredits(), deposit - bid);
-		assertEq(registrar.treasuryCredit(), bid);
+		assertEq(registrar.withdrawalCredits(winner), deposit - bid);
+		assertEq(registrar.totalWithdrawalCredits(), deposit);
+		assertEq(registrar.withdrawalCredits(registrar.treasury()), bid);
 		assertEq(address(registrar).balance, 2 * deposit);
 		assertEq(registrar.getCommitment(unopenedId).roundId, 1);
 		assertFalse(registrar.getCommitment(unopenedId).settled);

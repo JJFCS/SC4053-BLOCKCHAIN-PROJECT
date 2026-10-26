@@ -18,7 +18,7 @@ contract DomainRegistrarResolutionTest is Test {
     address internal nextTarget = address(104);
 
     function setUp() public {
-        registrar = new DomainRegistrar();
+        registrar = new DomainRegistrar(address(this));
         registrar.startRound();
         deposit   = registrar.COMMIT_DEPOSIT();
         salt      = bytes32(uint256(123));

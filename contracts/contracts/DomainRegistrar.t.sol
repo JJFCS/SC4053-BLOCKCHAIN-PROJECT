@@ -10,7 +10,7 @@ contract DomainRegistrarTest is Test {
     DomainRegistrar internal registrar;
 
     function setUp() public {
-        registrar = new DomainRegistrar();
+        registrar = new DomainRegistrar(address(this));
     }
 
     function test_AcceptsCanonicalLabels() public view {
@@ -112,7 +112,7 @@ contract DomainRegistrarTest is Test {
     }
 
     function test_CommitmentChangesForAnotherRegistrar() public {
-        DomainRegistrar otherRegistrar = new DomainRegistrar();
+        DomainRegistrar otherRegistrar = new DomainRegistrar(address(this));
         bytes32 salt   = bytes32(uint256(123));
         bytes32 first  = registrar.computeCommitment(1, address(1), "alice", 0.004 ether, salt);
         bytes32 second = otherRegistrar.computeCommitment(1, address(1), "alice", 0.004 ether, salt);

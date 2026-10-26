@@ -13,13 +13,15 @@ contract DomainPaymentReceiver {
     bool public paymentReentrySucceeded;
     bool public refundReentrySucceeded;
     bool public treasuryReentrySucceeded;
+	bool public withdrawalReentrySucceeded;
     bytes32 public paymentReentryError;
     bytes32 public refundReentryError;
     bytes32 public treasuryReentryError;
+	bytes32 public withdrawalReentryError;
 
     constructor(DomainRegistrar target) {
         if (address(target) == address(0)) {
-            registrar = new DomainRegistrar();
+            registrar = new DomainRegistrar(address(this));
         } else {
             registrar = target;
         }
@@ -57,6 +59,9 @@ contract DomainPaymentReceiver {
         (bool treasurySuccess, bytes memory treasuryData) = address(registrar).call(
             abi.encodeWithSelector(DomainRegistrar.withdrawTreasury.selector)
         );
+		(bool withdrawalSuccess, bytes memory withdrawalData) = address(registrar).call(
+			abi.encodeWithSelector(DomainRegistrar.withdraw.selector)
+		);
 
         paymentReentrySucceeded  = paymentSuccess;
         refundReentrySucceeded   = refundSuccess;
@@ -64,6 +69,8 @@ contract DomainPaymentReceiver {
         paymentReentryError      = keccak256(paymentData);
         refundReentryError       = keccak256(refundData);
         treasuryReentryError     = keccak256(treasuryData);
+		withdrawalReentrySucceeded = withdrawalSuccess;
+		withdrawalReentryError = keccak256(withdrawalData);
     }
 }
 
@@ -119,9 +126,13 @@ contract DomainRegistrarPaymentsTest is Test {
 
         vm.warp(registrar.getRound(1).startTime + 240);
         registrar.finalizeName("alice");
+		vm.prank(owner);
         registrar.settleCommit(winningId);
+		vm.prank(loser);
         registrar.settleCommit(loserId);
+		vm.prank(address(paymentReceiver));
         registrar.settleCommit(receiverId);
+		vm.prank(address(treasuryReceiver));
         registrar.settleCommit(treasuryId);
         // Leave "pending" reserved and its deposit locked to test escrow isolation
         _pointAliceTo(address(paymentReceiver));
@@ -259,11 +270,21 @@ contract DomainRegistrarPaymentsTest is Test {
 
         registrar.finalizeName("pending");
         uint256 recipientBefore = pendingBidder.balance;
+		uint256 lockedBefore = registrar.totalLockedDeposits();
+		uint256 creditsBefore = registrar.totalWithdrawalCredits();
+		uint256 treasuryBefore = registrar.withdrawalCredits(address(treasuryReceiver));
+		assertEq(lockedBefore, deposit - 0.005 ether);
+		assertEq(creditsBefore, 4 * deposit + 0.005 ether);
+		assertEq(treasuryBefore, deposit + WINNING_BID + 0.005 ether);
         vm.prank(payer);
         registrar.sendToDomain{value: 0.002 ether}("pending", pendingBidder);
 
         assertEq(pendingBidder.balance, recipientBefore + 0.002 ether);
-        _assertOriginalCredits();
+		assertEq(registrar.totalLockedDeposits(), lockedBefore);
+		assertEq(registrar.totalWithdrawalCredits(), creditsBefore);
+		assertEq(registrar.withdrawalCredits(address(treasuryReceiver)), treasuryBefore);
+		assertEq(registrar.withdrawalCredits(pendingBidder), 0);
+		_assertAccounting();
     }
 
     function test_ExtraEtherInRegistrarIsNotForwarded() public {
@@ -308,15 +329,15 @@ contract DomainRegistrarPaymentsTest is Test {
         paymentReceiver.configure(false, true);
         uint256 registrarBefore = address(registrar).balance;
         uint256 receiverBefore  = address(paymentReceiver).balance;
-        uint256 refundsBefore   = registrar.totalRefundCredits();
+        uint256 refundsBefore   = registrar.totalWithdrawalCredits();
         uint256 paid            = paymentReceiver.withdrawRefund();
 
         assertEq(paid, deposit);
         assertEq(address(paymentReceiver).balance, receiverBefore + paid);
         assertEq(address(registrar).balance, registrarBefore - paid);
-        assertEq(registrar.refundCredits(address(paymentReceiver)), 0);
-        assertEq(registrar.totalRefundCredits(), refundsBefore - paid);
-        assertEq(registrar.treasuryCredit(), WINNING_BID);
+        assertEq(registrar.withdrawalCredits(address(paymentReceiver)), 0);
+        assertEq(registrar.totalWithdrawalCredits(), refundsBefore - paid);
+        assertEq(registrar.withdrawalCredits(registrar.treasury()), deposit + WINNING_BID);
         assertEq(registrar.totalLockedDeposits(), deposit);
         _assertReentryBlocked(paymentReceiver);
         _assertAccounting();
@@ -327,15 +348,15 @@ contract DomainRegistrarPaymentsTest is Test {
         treasuryReceiver.configure(false, true);
         uint256 registrarBefore = address(registrar).balance;
         uint256 receiverBefore  = address(treasuryReceiver).balance;
-        uint256 refundsBefore   = registrar.totalRefundCredits();
+        uint256 refundsBefore   = registrar.totalWithdrawalCredits();
         uint256 paid            = treasuryReceiver.withdrawTreasury();
 
-        assertEq(paid, WINNING_BID);
+        assertEq(paid, deposit + WINNING_BID);
         assertEq(address(treasuryReceiver).balance, receiverBefore + paid);
         assertEq(address(registrar).balance, registrarBefore - paid);
-        assertEq(registrar.treasuryCredit(), 0);
-        assertEq(registrar.refundCredits(address(treasuryReceiver)), deposit);
-        assertEq(registrar.totalRefundCredits(), refundsBefore);
+        assertEq(registrar.withdrawalCredits(registrar.treasury()), 0);
+        assertEq(registrar.withdrawalCredits(address(treasuryReceiver)), 0);
+        assertEq(registrar.totalWithdrawalCredits(), refundsBefore - paid);
         assertEq(registrar.totalLockedDeposits(), deposit);
         _assertReentryBlocked(treasuryReceiver);
         _assertAccounting();
@@ -363,27 +384,29 @@ contract DomainRegistrarPaymentsTest is Test {
         assertFalse(receiver.paymentReentrySucceeded());
         assertFalse(receiver.refundReentrySucceeded());
         assertFalse(receiver.treasuryReentrySucceeded());
+		assertFalse(receiver.withdrawalReentrySucceeded());
         assertEq(receiver.paymentReentryError(), expectedError);
         assertEq(receiver.refundReentryError(), expectedError);
         assertEq(receiver.treasuryReentryError(), expectedError);
+		assertEq(receiver.withdrawalReentryError(), expectedError);
     }
 
     function _assertOriginalCredits() internal view {
         assertEq(registrar.totalLockedDeposits(), deposit);
-        assertEq(registrar.totalRefundCredits(), 4 * deposit - WINNING_BID);
-        assertEq(registrar.treasuryCredit(), WINNING_BID);
-        assertEq(registrar.refundCredits(owner), deposit - WINNING_BID);
-        assertEq(registrar.refundCredits(loser), deposit);
-        assertEq(registrar.refundCredits(address(paymentReceiver)), deposit);
-        assertEq(registrar.refundCredits(address(treasuryReceiver)), deposit);
-        assertEq(registrar.refundCredits(payer), 0);
-        assertEq(registrar.refundCredits(pendingBidder), 0);
+        assertEq(registrar.totalWithdrawalCredits(), 4 * deposit);
+        assertEq(registrar.withdrawalCredits(registrar.treasury()), deposit + WINNING_BID);
+        assertEq(registrar.withdrawalCredits(owner), deposit - WINNING_BID);
+        assertEq(registrar.withdrawalCredits(loser), deposit);
+        assertEq(registrar.withdrawalCredits(address(paymentReceiver)), deposit);
+        assertEq(registrar.withdrawalCredits(address(treasuryReceiver)), deposit + WINNING_BID);
+        assertEq(registrar.withdrawalCredits(payer), 0);
+        assertEq(registrar.withdrawalCredits(pendingBidder), 0);
         assertEq(registrar.commitmentCount(), 5);
         _assertAccounting();
     }
 
     function _accountedFor() internal view returns (uint256) {
-        return registrar.totalLockedDeposits() + registrar.totalRefundCredits() + registrar.treasuryCredit();
+        return registrar.totalLockedDeposits() + registrar.totalWithdrawalCredits();
     }
 
     function _assertAccounting() internal view {

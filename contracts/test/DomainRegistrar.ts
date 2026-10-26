@@ -11,7 +11,7 @@ describe("DomainRegistrar commitment", function () {
     // the hash 2 different ways and then compare the answers
 
     it("matches the hash calculated with ethers", async function () {
-        const registrar = await ethers.deployContract("DomainRegistrar");
+        const registrar = await ethers.deployContract("DomainRegistrar", [(await ethers.getSigners())[0].address]);
         await registrar.waitForDeployment();
         const startTransaction = await registrar.startRound();
         await startTransaction.wait();
@@ -38,7 +38,7 @@ describe("DomainRegistrar commitment", function () {
     });
 
     it("emits a receipt for an accepted commitment", async function () {
-        const registrar = await ethers.deployContract("DomainRegistrar");
+        const registrar = await ethers.deployContract("DomainRegistrar", [(await ethers.getSigners())[0].address]);
         await registrar.waitForDeployment();
         const startTransaction = await registrar.startRound();
         await startTransaction.wait();
@@ -57,7 +57,7 @@ describe("DomainRegistrar commitment", function () {
 
 describe("DomainRegistrar reveal", function () {
     it("emits the revealed details and exposes the leading bid", async function () {
-        const registrar = await ethers.deployContract("DomainRegistrar");
+        const registrar = await ethers.deployContract("DomainRegistrar", [(await ethers.getSigners())[0].address]);
         await registrar.waitForDeployment();
         const startTransaction = await registrar.startRound();
         await startTransaction.wait();
@@ -95,7 +95,7 @@ describe("DomainRegistrar reveal", function () {
 
 describe("DomainRegistrar ownership", function () {
     it("finalizes for the winner and exposes the owner to ethers", async function () {
-        const registrar = await ethers.deployContract("DomainRegistrar");
+        const registrar = await ethers.deployContract("DomainRegistrar", [(await ethers.getSigners())[0].address]);
         await registrar.waitForDeployment();
         const startTransaction = await registrar.startRound();
         await startTransaction.wait();
@@ -146,10 +146,10 @@ describe("DomainRegistrar ownership", function () {
 });
 
 describe("DomainRegistrar settlement", function () {
-    it("credits the bidder when another wallet settles the commitment", async function () {
+    it("requires the bidder to settle after finalization and credits the price once", async function () {
         const [treasury, bidder, settler] = await ethers.getSigners();
 
-        const registrar = await ethers.deployContract("DomainRegistrar");
+        const registrar = await ethers.deployContract("DomainRegistrar", [(await ethers.getSigners())[0].address]);
         await registrar.waitForDeployment();
         const startTransaction = await registrar.startRound();
         await startTransaction.wait();
@@ -175,13 +175,18 @@ describe("DomainRegistrar settlement", function () {
         await revealTransaction.wait();
         await networkHelpers.time.increaseTo(round.revealEnd);
         await expect(registrar.connect(settler).settleCommit(commitmentId))
+			.to.be.revertedWith("NOT BIDDER");
+		await expect(registrar.connect(bidder).settleBid(roundId)).to.be.revertedWith("DOMAIN NOT FINALIZED");
+		await (await registrar.connect(settler).finalizeDomain(roundId, label)).wait();
+		expect(await registrar.withdrawalCredits(treasury.address)).to.equal(bidWei);
+		await expect(registrar.connect(bidder).settleBid(roundId))
             .to.emit(registrar, "CommitmentSettled")
-            .withArgs(commitmentId,roundId,bidder.address,refundWei,bidWei);
+            .withArgs(commitmentId,roundId,bidder.address,refundWei,0n);
 
-        expect(await registrar.refundCredits(bidder.address)).to.equal(refundWei);
-        expect(await registrar.refundCredits(settler.address)).to.equal(0n);
-        expect(await registrar.totalRefundCredits()).to.equal(refundWei);
-        expect(await registrar.treasuryCredit()).to.equal(bidWei);
+        expect(await registrar.withdrawalCredits(bidder.address)).to.equal(refundWei);
+        expect(await registrar.withdrawalCredits(settler.address)).to.equal(0n);
+        expect(await registrar.totalWithdrawalCredits()).to.equal(deposit);
+        expect(await registrar.withdrawalCredits(await registrar.treasury())).to.equal(bidWei);
         expect(await registrar.totalLockedDeposits()).to.equal(0n);
 
         const commitment = await registrar.getCommitment(commitmentId);
@@ -194,7 +199,7 @@ describe("DomainRegistrar withdrawals", function () {
     it("pays the bidder refund and treasury proceeds", async function () {
         const [treasury, bidder] = await ethers.getSigners();
 
-        const registrar = await ethers.deployContract("DomainRegistrar");
+        const registrar = await ethers.deployContract("DomainRegistrar", [(await ethers.getSigners())[0].address]);
         await registrar.waitForDeployment();
         const startTransaction = await registrar.startRound();
         await startTransaction.wait();
@@ -218,19 +223,20 @@ describe("DomainRegistrar withdrawals", function () {
         await revealTransaction.wait();
         await networkHelpers.time.increaseTo(round.revealEnd);
 
-        const settlementTransaction = await registrar.settleCommit(commitmentId);
+		await (await registrar.finalizeDomain(roundId, label)).wait();
+        const settlementTransaction = await registrar.connect(bidder).settleBid(roundId);
         await settlementTransaction.wait();
 
-        await expect(registrar.connect(bidder).withdrawRefund()).to.emit(registrar, "RefundWithdrawn").withArgs(bidder.address, refundWei);
+        await expect(registrar.connect(bidder).withdraw()).to.emit(registrar, "Withdrawn").withArgs(bidder.address, refundWei);
 
-        expect(await registrar.refundCredits(bidder.address)).to.equal(0n);
-        expect(await registrar.totalRefundCredits()).to.equal(0n);
-        expect(await registrar.treasuryCredit()).to.equal(bidWei);
+        expect(await registrar.withdrawalCredits(bidder.address)).to.equal(0n);
+        expect(await registrar.totalWithdrawalCredits()).to.equal(bidWei);
+        expect(await registrar.withdrawalCredits(await registrar.treasury())).to.equal(bidWei);
         expect(await ethers.provider.getBalance(await registrar.getAddress())).to.equal(bidWei);
 
-        await expect(registrar.connect(treasury).withdrawTreasury()).to.emit(registrar, "TreasuryWithdrawn").withArgs(treasury.address, bidWei);
+        await expect(registrar.connect(treasury).withdraw()).to.emit(registrar, "Withdrawn").withArgs(treasury.address, bidWei);
 
-        expect(await registrar.treasuryCredit()).to.equal(0n);
+        expect(await registrar.withdrawalCredits(await registrar.treasury())).to.equal(0n);
         expect(await ethers.provider.getBalance(await registrar.getAddress())).to.equal(0n);
     });
 });
@@ -239,7 +245,7 @@ describe("DomainRegistrar resolution", function () {
     it("lets the owner update the payment address while preserving ownership", async function () {
         const [bidder, recipient, outsider] = await ethers.getSigners();
 
-        const registrar = await ethers.deployContract("DomainRegistrar");
+        const registrar = await ethers.deployContract("DomainRegistrar", [(await ethers.getSigners())[0].address]);
         await registrar.waitForDeployment();
         const startTransaction = await registrar.startRound();
         await startTransaction.wait();

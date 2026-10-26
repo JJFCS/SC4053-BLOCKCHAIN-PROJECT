@@ -16,7 +16,7 @@ contract DomainRegistrarOwnershipTest is Test {
     address         internal outsider = address(103);
 
     function setUp() public {
-        registrar = new DomainRegistrar();
+        registrar = new DomainRegistrar(address(this));
         registrar.startRound();
         deposit   = registrar.COMMIT_DEPOSIT();
         salt      = bytes32(uint256(123));
@@ -67,8 +67,9 @@ contract DomainRegistrarOwnershipTest is Test {
         assertEq(domain.priceWei, 0.006 ether);
         assertEq(registrar.resolve("alice"), bob);
 
-        // the finalization records ownership without moving deposits
-        assertEq(registrar.totalLockedDeposits(), 2 * deposit);
+		// Finalization allocates the price without sending ETH.
+        assertEq(registrar.totalLockedDeposits(), 2 * deposit - 0.006 ether);
+		assertEq(registrar.withdrawalCredits(registrar.treasury()), 0.006 ether);
         assertEq(address(registrar).balance,      2 * deposit);
     }
 
@@ -145,7 +146,7 @@ contract DomainRegistrarOwnershipTest is Test {
 
     function test_WithoutValidRevealThereIsNoOwner() public {
         // use another registrar to test names without a valid reveal
-        DomainRegistrar otherRegistrar = new DomainRegistrar();
+        DomainRegistrar otherRegistrar = new DomainRegistrar(address(this));
         otherRegistrar.startRound();
         uint256 start = otherRegistrar.getRound(1).startTime;
 
