@@ -15,6 +15,7 @@ contract DomainRegistrarRevealTest is Test {
 
     function setUp() public {
         registrar = new DomainRegistrar();
+        registrar.startRound();
         deposit   = registrar.COMMIT_DEPOSIT();
         bidWei    = 0.004 ether;
         salt      = bytes32(uint256(123));
@@ -25,7 +26,7 @@ contract DomainRegistrarRevealTest is Test {
     }
 
     function test_RevealStartsAt120SecondsAndStoresBid() public {
-        uint256 start = registrar.auctionStart();
+        uint256 start = registrar.getRound(1).startTime;
 
         vm.warp(start + 119);
 
@@ -50,7 +51,7 @@ contract DomainRegistrarRevealTest is Test {
 
     function test_RevealEndsAt240Seconds() public {
         uint256 lateId = _commitBid("bob", bidWei);
-        uint256 start  = registrar.auctionStart();
+        uint256 start  = registrar.getRound(1).startTime;
 
         vm.warp(start + 239);
 
@@ -65,8 +66,12 @@ contract DomainRegistrarRevealTest is Test {
     }
 
     function test_RevealUsesOriginalRound() public {
-        // round 2 is about revealing but this commitment belongs to round 1
-        vm.warp(registrar.auctionStart() + 360);
+        // Round 2 is revealing, but this commitment still belongs to ended round 1.
+        uint256 start = registrar.getRound(1).startTime;
+        vm.warp(start + 240);
+        registrar.startRound();
+        vm.warp(start + 360);
+        assertTrue(registrar.getRound(2).phase == DomainRegistrar.Phase.Reveal);
 
         vm.expectRevert(bytes("NOT REVEAL PHASE"));
         registrar.reveal(commitmentId, "alice", bidWei, salt);
@@ -75,7 +80,7 @@ contract DomainRegistrarRevealTest is Test {
     }
 
     function test_RevealRejectsChangedDetailsAndAllowsRetry() public {
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
 
         vm.expectRevert(bytes("COMMITMENT MISMATCH"));
         registrar.reveal(commitmentId, "bob", bidWei, salt);
@@ -91,7 +96,7 @@ contract DomainRegistrarRevealTest is Test {
     }
 
     function test_RevealRejectsSecondReveal() public {
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
 
         assertTrue(registrar.reveal(commitmentId, "alice", bidWei, salt));
 
@@ -102,7 +107,7 @@ contract DomainRegistrarRevealTest is Test {
     function test_RevealConsumesInvalidLabel() public {
         uint256 invalidId = _commitBid("Alice", bidWei);
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
 
         assertFalse(registrar.reveal(invalidId, "Alice", bidWei, salt));
 
@@ -121,7 +126,7 @@ contract DomainRegistrarRevealTest is Test {
         uint256 minimumId = _commitBid("minimum", 1);
         uint256 maximumId = _commitBid("maximum", deposit);
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
 
         assertFalse(registrar.reveal(zeroId, "zero", 0, salt));
         assertFalse(registrar.reveal(largeId, "large", deposit + 1, salt));
@@ -144,7 +149,7 @@ contract DomainRegistrarRevealTest is Test {
             copiedDigest
         );
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
         vm.startPrank(otherBidder);
         vm.expectRevert(bytes("NOT BIDDER"));
         registrar.reveal(commitmentId, "alice", bidWei, salt);
@@ -159,7 +164,7 @@ contract DomainRegistrarRevealTest is Test {
     }
 
     function test_RevealRejectsUnknownId() public {
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
         vm.expectRevert(bytes("INVALID COMMITMENT"));
 
         registrar.reveal(0, "alice", bidWei, salt);

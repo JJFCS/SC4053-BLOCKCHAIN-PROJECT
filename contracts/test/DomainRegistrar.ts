@@ -13,6 +13,8 @@ describe("DomainRegistrar commitment", function () {
     it("matches the hash calculated with ethers", async function () {
         const registrar = await ethers.deployContract("DomainRegistrar");
         await registrar.waitForDeployment();
+        const startTransaction = await registrar.startRound();
+        await startTransaction.wait();
 
         const [bidder]    = await ethers.getSigners();
         const networkInfo = await ethers.provider.getNetwork();
@@ -38,6 +40,8 @@ describe("DomainRegistrar commitment", function () {
     it("emits a receipt for an accepted commitment", async function () {
         const registrar = await ethers.deployContract("DomainRegistrar");
         await registrar.waitForDeployment();
+        const startTransaction = await registrar.startRound();
+        await startTransaction.wait();
 
         const [bidder] = await ethers.getSigners();
         const digest   = ethers.id("example commitment");
@@ -55,6 +59,8 @@ describe("DomainRegistrar reveal", function () {
     it("emits the revealed details and exposes the leading bid", async function () {
         const registrar = await ethers.deployContract("DomainRegistrar");
         await registrar.waitForDeployment();
+        const startTransaction = await registrar.startRound();
+        await startTransaction.wait();
 
         const [bidder]  = await ethers.getSigners();
 
@@ -91,6 +97,8 @@ describe("DomainRegistrar ownership", function () {
     it("finalizes for the winner and exposes the owner to ethers", async function () {
         const registrar = await ethers.deployContract("DomainRegistrar");
         await registrar.waitForDeployment();
+        const startTransaction = await registrar.startRound();
+        await startTransaction.wait();
 
         const [bidder, finalizer] = await ethers.getSigners();
 
@@ -143,6 +151,8 @@ describe("DomainRegistrar settlement", function () {
 
         const registrar = await ethers.deployContract("DomainRegistrar");
         await registrar.waitForDeployment();
+        const startTransaction = await registrar.startRound();
+        await startTransaction.wait();
 
         const roundId      = 1n;
         const commitmentId = 1n;
@@ -186,6 +196,8 @@ describe("DomainRegistrar withdrawals", function () {
 
         const registrar = await ethers.deployContract("DomainRegistrar");
         await registrar.waitForDeployment();
+        const startTransaction = await registrar.startRound();
+        await startTransaction.wait();
 
         const roundId      = 1n;
         const commitmentId = 1n;
@@ -229,6 +241,8 @@ describe("DomainRegistrar resolution", function () {
 
         const registrar = await ethers.deployContract("DomainRegistrar");
         await registrar.waitForDeployment();
+        const startTransaction = await registrar.startRound();
+        await startTransaction.wait();
 
         const roundId      = 1n;
         const commitmentId = 1n;

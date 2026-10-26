@@ -13,6 +13,7 @@ contract DomainRegistrarCommitTest is Test {
 
     function setUp() public {
         registrar = new DomainRegistrar();
+        registrar.startRound();
         deposit   = registrar.COMMIT_DEPOSIT();
         digest    = keccak256("example commitment");
 
@@ -51,19 +52,23 @@ contract DomainRegistrarCommitTest is Test {
     }
 
     function test_CommitRejectsWrongRoundAndRevealPhase() public {
-        vm.expectRevert(bytes("WRONG ROUND"));
+        vm.expectRevert(bytes("INVALID ROUND"));
         registrar.commit{value: deposit}(0, digest);
 
-        vm.expectRevert(bytes("WRONG ROUND"));
+        vm.expectRevert(bytes("INVALID ROUND"));
         registrar.commit{value: deposit}(2, digest);
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
 
         vm.expectRevert(bytes("NOT COMMIT PHASE"));
         registrar.commit{value: deposit}(1, digest);
 
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
 
+        vm.expectRevert(bytes("NOT COMMIT PHASE"));
+        registrar.commit{value: deposit}(1, digest);
+
+        registrar.startRound();
         vm.expectRevert(bytes("WRONG ROUND"));
         registrar.commit{value: deposit}(1, digest);
 
@@ -128,7 +133,8 @@ contract DomainRegistrarCommitTest is Test {
     function test_CommitAcceptsNextRoundAtItsStart() public {
         uint256 firstId = registrar.commit{value: deposit}(1, digest);
 
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
+        registrar.startRound();
 
         uint256 secondId = registrar.commit{value: deposit}(2, digest);
 

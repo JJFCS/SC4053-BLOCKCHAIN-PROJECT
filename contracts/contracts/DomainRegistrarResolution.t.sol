@@ -19,6 +19,7 @@ contract DomainRegistrarResolutionTest is Test {
 
     function setUp() public {
         registrar = new DomainRegistrar();
+        registrar.startRound();
         deposit   = registrar.COMMIT_DEPOSIT();
         salt      = bytes32(uint256(123));
 
@@ -30,7 +31,7 @@ contract DomainRegistrarResolutionTest is Test {
         winningId       = _commitBid(bob, "alice", 0.006 ether);
         otherId         = _commitBid(carol, "bob", 0.005 ether);
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
 
         vm.prank(alice);
         assertTrue(registrar.reveal(aliceId,   "alice", 0.004 ether, salt));
@@ -124,7 +125,7 @@ contract DomainRegistrarResolutionTest is Test {
     function test_ReservationClearsOnlyAfterFinalization() public {
         assertEq(registrar.reservedRound("alice"), 1);
 
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
 
         assertEq(registrar.reservedRound("alice"), 1);
         assertEq(registrar.ownerOf("alice"), address(0));
@@ -190,7 +191,7 @@ contract DomainRegistrarResolutionTest is Test {
     }
 
     function _finalizeAlice() internal {
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
         registrar.finalizeName("alice");
     }
 }
