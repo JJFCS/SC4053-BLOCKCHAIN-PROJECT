@@ -41,8 +41,8 @@ contract DomainRegistrarSettlementTest is Test {
         vm.prank(alice);assertTrue(registrar.reveal(aliceId, "alice", 0.004 ether, salt));
         vm.prank(bob);assertTrue(registrar.reveal(bobId, "alice", 0.006 ether, salt));
         vm.prank(carol);
-
-        assertFalse(registrar.reveal(invalidId, "invalid", 0, salt));
+		vm.expectRevert(bytes("INVALID BID"));
+		registrar.reveal(invalidId, "invalid", 0, salt);
     }
 
     function test_SettlementStartsAt240SecondsAndCreditsWinner() public {
@@ -92,19 +92,20 @@ contract DomainRegistrarSettlementTest is Test {
         _assertAccounting();
     }
 
-    function test_InvalidRevealGetsFullDeposit() public {
+    function test_RejectedRevealRemainsUnrevealedAtSettlement() public {
         vm.warp(registrar.getRound(1).startTime + 240);
 
         (uint256 refund, uint256 proceeds) = registrar.settleCommit(invalidId);
 
-        assertEq(refund, deposit);
-        assertEq(proceeds, 0);
-        assertEq(registrar.refundCredits(carol), deposit);
-        assertEq(registrar.treasuryCredit(), 0);
+		// This step changes reveal validation. Non-reveal economics are updated next.
+        assertEq(refund, 0);
+        assertEq(proceeds, deposit);
+        assertEq(registrar.refundCredits(carol), 0);
+        assertEq(registrar.treasuryCredit(), deposit);
 
         DomainRegistrar.CommitmentInfo memory info = registrar.getCommitment(invalidId);
 
-        assertTrue(info.revealed);
+        assertFalse(info.revealed);
         assertFalse(info.valid);
         assertTrue(info.settled);
 
@@ -200,11 +201,11 @@ contract DomainRegistrarSettlementTest is Test {
         assertEq(registrar.totalLockedDeposits(), 0);
         assertEq(registrar.refundCredits(alice), deposit);
         assertEq(registrar.refundCredits(bob), 0.004 ether);
-        assertEq(registrar.refundCredits(carol), deposit);
+        assertEq(registrar.refundCredits(carol), 0);
         assertEq(registrar.refundCredits(dave), 0);
 
-        assertEq(registrar.totalRefundCredits(),2 * deposit + 0.004 ether);
-        assertEq(registrar.treasuryCredit(),deposit + 0.006 ether);
+        assertEq(registrar.totalRefundCredits(),deposit + 0.004 ether);
+        assertEq(registrar.treasuryCredit(),2 * deposit + 0.006 ether);
         assertEq(address(registrar).balance, 4 * deposit);
 
         _assertAccounting();

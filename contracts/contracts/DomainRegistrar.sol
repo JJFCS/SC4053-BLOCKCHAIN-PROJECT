@@ -62,6 +62,7 @@ contract DomainRegistrar {
         address resolutionAddress;
     }
 
+	uint256 public constant MIN_LABEL_BYTES = 3;
     uint256 public constant  MAX_LABEL_BYTES = 32;  // an unsigned integer of 256 bit integer type with the name MAX_LABEL_BYTES and a value of 32
     uint256 public constant  COMMIT_DURATION = 120 seconds;
     uint256 public constant  REVEAL_DURATION = 120 seconds;
@@ -79,7 +80,7 @@ contract DomainRegistrar {
     bool private _withdrawing;
 
     mapping(uint256 => CommitmentInfo) private _commitments;
-    mapping(bytes32 => bool)           private _usedCommitments;
+	mapping(uint256 => mapping(address => uint256)) private _commitmentIds;
 	mapping(uint256 => mapping(bytes32 => AuctionInfo)) private _auctions;
 	mapping(bytes32 => uint256) private _reservedRounds;
     mapping(bytes32 => DomainInfo)     private _domains;
@@ -187,21 +188,27 @@ contract DomainRegistrar {
         _withdrawing = false;
     }
 
-    function commit(uint256 roundId , bytes32 digest) external payable returns (uint256 commitmentId) {
+	function commitBid(uint256 roundId, bytes32 digest) external payable {
+		_commitBid(roundId, digest);
+	}
+
+	// Keep the earlier entry point, with the same one-per-wallet checks.
+	function commit(uint256 roundId, bytes32 digest) external payable returns (uint256 commitmentId) {
+		return _commitBid(roundId, digest);
+	}
+
+	function _commitBid(uint256 roundId, bytes32 digest) internal returns (uint256 commitmentId) {
 		RoundInfo memory round = getRound(roundId);
 		require(roundId == _latestRoundId, "WRONG ROUND");
 		require(round.phase == Phase.Commit, "NOT COMMIT PHASE");
         require(msg.value == COMMIT_DEPOSIT, "INCORRECT DEPOSIT");
         require(digest != bytes32(0), "EMPTY COMMITMENT");
 
-        bytes32 duplicateKey = keccak256(abi.encode(roundId, msg.sender, digest));
-
-        require(!_usedCommitments[duplicateKey], "DUPLICATE COMMITMENT");
-
-        _usedCommitments[duplicateKey] = true;
+		require(_commitmentIds[roundId][msg.sender] == 0, "ALREADY COMMITTED");
 
         commitmentCount += 1;
         commitmentId = commitmentCount;
+		_commitmentIds[roundId][msg.sender] = commitmentId;
 
         CommitmentInfo storage info = _commitments[commitmentId];
         info.bidder  = msg.sender;
@@ -216,7 +223,17 @@ contract DomainRegistrar {
         return commitmentId;
     }
 
-    function reveal(uint256 commitmentId , string memory label , uint256 bidWei , bytes32 salt) external returns (bool valid) {
+	function revealBid(uint256 roundId, string calldata label, uint256 bidWei, bytes32 salt) external {
+		uint256 commitmentId = getCommitmentId(roundId, msg.sender);
+		require(commitmentId != 0, "NO COMMITMENT");
+		_revealBid(commitmentId, label, bidWei, salt);
+	}
+
+	function reveal(uint256 commitmentId, string memory label, uint256 bidWei, bytes32 salt) external returns (bool valid) {
+		return _revealBid(commitmentId, label, bidWei, salt);
+	}
+
+	function _revealBid(uint256 commitmentId, string memory label, uint256 bidWei, bytes32 salt) internal returns (bool) {
         require(commitmentId > 0 && commitmentId <= commitmentCount , "INVALID COMMITMENT");
 
         CommitmentInfo storage info = _commitments[commitmentId];
@@ -224,44 +241,42 @@ contract DomainRegistrar {
         require(msg.sender == info.bidder, "NOT BIDDER");  // continue only if this condition is true --> this goes for all require
         require(!info.revealed, "ALREADY REVEALED");
         require(getRound(info.roundId).phase == Phase.Reveal, "NOT REVEAL PHASE");
+		require(isValidLabel(label), "INVALID LABEL");
+		require(bidWei > 0 && bidWei <= info.deposit, "INVALID BID");
+
+		bytes32 labelHash = keccak256(bytes(label));
+		require(_domains[labelHash].owner == address(0), "ALREADY REGISTERED");
+		uint256 reservation = _reservedRounds[labelHash];
+		require(reservation == 0 || reservation == info.roundId, "NAME RESERVED");
         require(
             computeCommitment(info.roundId, info.bidder, label, bidWei, salt)  == info.digest,
             "COMMITMENT MISMATCH"
         );
 
-        info.revealed  = true;
-        info.labelHash = keccak256(bytes(label));
-        info.bidWei    = bidWei;
+		// Every validation above must pass before the commitment is consumed.
+		info.revealed = true;
+		info.valid = true;
+		info.labelHash = labelHash;
+		info.bidWei = bidWei;
 
-		uint256 reservation = _reservedRounds[info.labelHash];
-		valid = isValidLabel(label) && bidWei > 0 && bidWei <= info.deposit &&
-			_domains[info.labelHash].owner == address(0) &&
-			(reservation == 0 || reservation == info.roundId);
-        info.valid = valid;
+		AuctionInfo storage auction = _auctions[info.roundId][labelHash];
+		if (auction.winningCommitmentId == 0) {
+			auction.roundId = info.roundId;
+			_reservedRounds[labelHash] = info.roundId;
+			_rounds[info.roundId].pendingDomainCount += 1;
+		}
 
-        if (valid) {
-			AuctionInfo storage auction = _auctions[info.roundId][info.labelHash];
-			if (auction.winningCommitmentId == 0) {
-				auction.roundId = info.roundId;
-				_reservedRounds[info.labelHash] = info.roundId;
-				_rounds[info.roundId].pendingDomainCount += 1;
-			}
+		// A smaller commitment ID means an earlier on-chain commit sequence.
+		bool becomesLeader = auction.winningCommitmentId == 0 || bidWei > auction.highestBidWei ||
+			(bidWei == auction.highestBidWei && commitmentId < auction.winningCommitmentId);
+		if (becomesLeader) {
+			auction.winningCommitmentId = commitmentId;
+			auction.highestBidder = info.bidder;
+			auction.highestBidWei = bidWei;
+		}
 
-            // so this checks the first bid , the higher bidder , and also if there is
-            // an earlier bid but with a earlier commitment ID
-            bool becomesLeader = auction.winningCommitmentId == 0 || bidWei > auction.highestBidWei ||
-                (bidWei == auction.highestBidWei && commitmentId < auction.winningCommitmentId);
-
-            if (becomesLeader) {
-                auction.winningCommitmentId = commitmentId;
-                auction.highestBidder = info.bidder;
-                auction.highestBidWei = bidWei;
-            }
-        }
-
-        emit CommitmentRevealed(commitmentId , info.roundId , info.bidder , label , bidWei , valid);
-
-        return valid;
+		emit CommitmentRevealed(commitmentId, info.roundId, info.bidder, label, bidWei, true);
+		return true;
     }
 
     function withdrawRefund() external nonReentrant returns (uint256 amount) {
@@ -456,6 +471,15 @@ contract DomainRegistrar {
         return _commitments[commitmentId];
     }
 
+	function getCommitmentId(uint256 roundId, address bidder) public view returns (uint256) {
+		require(roundId > 0 && roundId <= _latestRoundId, "INVALID ROUND");
+		return _commitmentIds[roundId][bidder];
+	}
+
+	function getCommitmentForRound(uint256 roundId, address bidder) public view returns (CommitmentInfo memory) {
+		return _commitments[getCommitmentId(roundId, bidder)];
+	}
+
     function getCurrentRound() public view returns (uint256) {
 		// This is the latest started round, including while it is already ended.
 		return _latestRoundId;
@@ -495,7 +519,7 @@ contract DomainRegistrar {
         bytes memory characters = bytes(label);
         uint256 length = characters.length;
 
-        if (length == 0 || length > MAX_LABEL_BYTES) {  // basically if the input is empty or more than 32 bytes
+        if (length < MIN_LABEL_BYTES || length > MAX_LABEL_BYTES) {  // require 3-32 ASCII characters
             return false;
         }
 

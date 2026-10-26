@@ -133,10 +133,10 @@ contract DomainRegistrarOwnershipTest is Test {
         vm.warp(start + 360);
 
         vm.prank(alice);
-        bool valid = registrar.reveal(laterId,"alice",0.009 ether,salt);
+		vm.expectRevert(bytes("ALREADY REGISTERED"));
+		registrar.reveal(laterId,"alice",0.009 ether,salt);
 
-        assertFalse(valid);
-        assertTrue(registrar.getCommitment(laterId).revealed);
+        assertFalse(registrar.getCommitment(laterId).revealed);
         assertFalse(registrar.getCommitment(laterId).valid);
 
         assertEq(registrar.resolve("alice"), bob);
@@ -150,19 +150,20 @@ contract DomainRegistrarOwnershipTest is Test {
         uint256 start = otherRegistrar.getRound(1).startTime;
 
         bytes32 unopenedDigest = otherRegistrar.computeCommitment(1, alice, "unopened", 0.004 ether, salt);
-        bytes32 invalidDigest = otherRegistrar.computeCommitment(1, alice, "invalid", 0, salt);
+        bytes32 invalidDigest = otherRegistrar.computeCommitment(1, bob, "invalid", 0, salt);
 
         vm.prank(alice);
         otherRegistrar.commit{value: deposit}(1, unopenedDigest);
 
-        vm.prank(alice);
+        vm.prank(bob);
         uint256 invalidId = otherRegistrar.commit{value: deposit}(1,invalidDigest);
 
         vm.warp(start + 120);
 
-        vm.prank(alice);
-        bool valid = otherRegistrar.reveal(invalidId,"invalid",0,salt);
-        assertFalse(valid);
+		vm.prank(bob);
+		vm.expectRevert(bytes("INVALID BID"));
+		otherRegistrar.reveal(invalidId,"invalid",0,salt);
+		assertFalse(otherRegistrar.getCommitment(invalidId).revealed);
 
         vm.warp(start + 240);
 

@@ -76,9 +76,15 @@ contract DomainRegistrarAuctionRecordsTest is Test {
 		_commit(1, dave, "unopened", 0.004 ether);
 		_toReveal(1);
 
-		assertFalse(_reveal(uppercase, alice, "Alice", 0.004 ether));
-		assertFalse(_reveal(zero, bob, "zero", 0));
-		assertFalse(_reveal(large, carol, "large", deposit + 1));
+		vm.expectRevert(bytes("INVALID LABEL"));
+		_reveal(uppercase, alice, "Alice", 0.004 ether);
+		vm.expectRevert(bytes("INVALID BID"));
+		_reveal(zero, bob, "zero", 0);
+		vm.expectRevert(bytes("INVALID BID"));
+		_reveal(large, carol, "large", deposit + 1);
+		assertFalse(registrar.getCommitment(uppercase).revealed);
+		assertFalse(registrar.getCommitment(zero).revealed);
+		assertFalse(registrar.getCommitment(large).revealed);
 		assertEq(_pending(1), 0);
 		_assertEmptyAuction(1, "zero");
 		_assertEmptyAuction(1, "large");
@@ -203,7 +209,9 @@ contract DomainRegistrarAuctionRecordsTest is Test {
 		registrar.startRound();
 		uint256 laterId = _commit(2, bob, "alice", 0.009 ether);
 		_toReveal(2);
-		assertFalse(_reveal(laterId, bob, "alice", 0.009 ether));
+		vm.expectRevert(bytes("NAME RESERVED"));
+		_reveal(laterId, bob, "alice", 0.009 ether);
+		assertFalse(registrar.getCommitment(laterId).revealed);
 
 		assertEq(_pending(1), 1);
 		assertEq(_pending(2), 0);
@@ -219,7 +227,9 @@ contract DomainRegistrarAuctionRecordsTest is Test {
 		registrar.startRound();
 		uint256 laterId = _commit(2, bob, "alice", 0.009 ether);
 		_toReveal(2);
-		assertFalse(_reveal(laterId, bob, "alice", 0.009 ether));
+		vm.expectRevert(bytes("ALREADY REGISTERED"));
+		_reveal(laterId, bob, "alice", 0.009 ether);
+		assertFalse(registrar.getCommitment(laterId).revealed);
 
 		assertEq(_pending(1), 0);
 		assertEq(_pending(2), 0);
