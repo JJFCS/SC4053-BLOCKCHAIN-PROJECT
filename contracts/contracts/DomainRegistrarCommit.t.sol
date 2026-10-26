@@ -81,24 +81,26 @@ contract DomainRegistrarCommitTest is Test {
         registrar.commit{value: deposit}(1, bytes32(0));
     }
 
-    function test_CommitRejectsDuplicateButAllowsAnotherHash() public {
+    function test_CommitRejectsSecondCommitmentEvenWithAnotherHash() public {
         uint256 firstId = registrar.commit{value: deposit}(1, digest);
 
-        vm.expectRevert(bytes("DUPLICATE COMMITMENT"));
+        vm.expectRevert(bytes("ALREADY COMMITTED"));
         registrar.commit{value: deposit}(1, digest);
 
         assertEq(registrar.commitmentCount(), 1);
 
-        uint256 secondId = registrar.commit{value: deposit}(
+		vm.expectRevert(bytes("ALREADY COMMITTED"));
+		registrar.commit{value: deposit}(
             1,
             keccak256("another commitment")
         );
 
         assertEq(firstId, 1);
-        assertEq(secondId, 2);
-        assertEq(registrar.commitmentCount(), 2);
-        assertEq(registrar.totalLockedDeposits(), 2 * deposit);
-        assertEq(address(registrar).balance, 2 * deposit);
+		assertEq(registrar.getCommitmentId(1, address(this)), firstId);
+		assertEq(registrar.getCommitment(firstId).digest, digest);
+        assertEq(registrar.commitmentCount(), 1);
+        assertEq(registrar.totalLockedDeposits(), deposit);
+        assertEq(address(registrar).balance, deposit);
     }
 
     function test_CommitAllowsSameHashFromAnotherBidder() public {

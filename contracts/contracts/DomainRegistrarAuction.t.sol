@@ -114,20 +114,25 @@ contract DomainRegistrarAuctionTest is Test {
 
     function test_InvalidRevealsDoNotReserveName() public {
         uint256 uppercaseId = _commitBid(1, alice, "Alice", 0.004 ether);
-        uint256 zeroId      = _commitBid(1, alice, "alice", 0);
-        uint256 largeId     = _commitBid(1, alice, "alice", deposit + 1);
-        uint256 validId     = _commitBid(1, bob,   "alice", 0.004 ether);
+		uint256 zeroId = _commitBid(1, bob, "alice", 0);
+		uint256 largeId = _commitBid(1, carol, "alice", deposit + 1);
+		address validBidder = address(104);
+		vm.deal(validBidder, deposit);
+		uint256 validId = _commitBid(1, validBidder, "alice", 0.004 ether);
 
         vm.warp(registrar.getRound(1).startTime + 120);
 
-        assertFalse(_revealBid(uppercaseId, alice, "Alice", 0.004 ether));
+		vm.expectRevert(bytes("INVALID LABEL"));
+		_revealBid(uppercaseId, alice, "Alice", 0.004 ether);
         assertEq(registrar.getAuction("Alice").roundId, 0);
 
-        assertFalse(_revealBid(zeroId,  alice, "alice", 0));
-        assertFalse(_revealBid(largeId, alice, "alice", deposit + 1));
+		vm.expectRevert(bytes("INVALID BID"));
+		_revealBid(zeroId, bob, "alice", 0);
+		vm.expectRevert(bytes("INVALID BID"));
+		_revealBid(largeId, carol, "alice", deposit + 1);
         assertEq(registrar.getAuction("alice").roundId, 0);
 
-        assertTrue(_revealBid(validId, bob, "alice", 0.004 ether));
+        assertTrue(_revealBid(validId, validBidder, "alice", 0.004 ether));
         assertEq(registrar.getAuction("alice").winningCommitmentId, validId);
     }
 
@@ -143,7 +148,8 @@ contract DomainRegistrarAuctionTest is Test {
         uint256 laterId = _commitBid(2, bob,  "alice", 0.009 ether);
 
         vm.warp(start + 360);
-        assertFalse(_revealBid(laterId, bob,  "alice", 0.009 ether));
+		vm.expectRevert(bytes("NAME RESERVED"));
+		_revealBid(laterId, bob, "alice", 0.009 ether);
 
         DomainRegistrar.AuctionInfo memory auction = registrar.getAuction("alice");
 
@@ -152,7 +158,7 @@ contract DomainRegistrarAuctionTest is Test {
         assertEq(auction.highestBidder, alice);
         assertEq(auction.highestBidWei, 0.004 ether);
 
-        assertTrue(registrar.getCommitment(laterId).revealed);
+        assertFalse(registrar.getCommitment(laterId).revealed);
         assertFalse(registrar.getCommitment(laterId).valid);
     }
 

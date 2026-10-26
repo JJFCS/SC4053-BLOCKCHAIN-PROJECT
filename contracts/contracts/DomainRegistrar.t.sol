@@ -15,12 +15,20 @@ contract DomainRegistrarTest is Test {
 
     function test_AcceptsCanonicalLabels() public view {
         assertTrue(registrar.isValidLabel("alice"));  // we ask the registrar whether the value "alice" is valid otherwise it will fail
-        assertTrue(registrar.isValidLabel("a"));
-        assertTrue(registrar.isValidLabel("0"));
+		assertTrue(registrar.isValidLabel("abc"));
+		assertTrue(registrar.isValidLabel("000"));
+		assertTrue(registrar.isValidLabel("a-b"));
         assertTrue(registrar.isValidLabel("alice123"));
         assertTrue(registrar.isValidLabel("alice-bob"));
         assertTrue(registrar.isValidLabel("a--b"));
     }
+
+	function test_RejectsOneAndTwoByteLabels() public view {
+		assertFalse(registrar.isValidLabel("a"));
+		assertFalse(registrar.isValidLabel("0"));
+		assertFalse(registrar.isValidLabel("ab"));
+		assertFalse(registrar.isValidLabel("12"));
+	}
 
     function test_Accepts32ByteLabel() public view {
         assertTrue(

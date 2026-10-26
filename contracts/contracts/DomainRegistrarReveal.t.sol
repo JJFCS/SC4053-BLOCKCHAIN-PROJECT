@@ -50,7 +50,8 @@ contract DomainRegistrarRevealTest is Test {
     }
 
     function test_RevealEndsAt240Seconds() public {
-        uint256 lateId = _commitBid("bob", bidWei);
+		address lateBidder = address(123);
+		uint256 lateId = _commitAs(lateBidder, "bob", bidWei);
         uint256 start  = registrar.getRound(1).startTime;
 
         vm.warp(start + 239);
@@ -60,6 +61,7 @@ contract DomainRegistrarRevealTest is Test {
         vm.warp(start + 240);
 
         vm.expectRevert(bytes("NOT REVEAL PHASE"));
+		vm.prank(lateBidder);
         registrar.reveal(lateId, "bob", bidWei, salt);
 
         assertFalse(registrar.getCommitment(lateId).revealed);
@@ -104,39 +106,52 @@ contract DomainRegistrarRevealTest is Test {
         registrar.reveal(commitmentId, "alice", bidWei, salt);
     }
 
-    function test_RevealConsumesInvalidLabel() public {
-        uint256 invalidId = _commitBid("Alice", bidWei);
+    function test_RevealRejectsInvalidLabelWithoutConsuming() public {
+		address invalidBidder = address(123);
+        uint256 invalidId = _commitAs(invalidBidder, "Alice", bidWei);
 
         vm.warp(registrar.getRound(1).startTime + 120);
 
-        assertFalse(registrar.reveal(invalidId, "Alice", bidWei, salt));
+		vm.expectRevert(bytes("INVALID LABEL"));
+		vm.prank(invalidBidder);
+		registrar.reveal(invalidId, "Alice", bidWei, salt);
 
         DomainRegistrar.CommitmentInfo memory info = registrar.getCommitment(invalidId);
 
-        assertTrue(info.revealed);
+        assertFalse(info.revealed);
         assertFalse(info.valid);
+		assertEq(info.labelHash, bytes32(0));
+		assertEq(info.bidWei, 0);
 
-        vm.expectRevert(bytes("ALREADY REVEALED"));
+		vm.expectRevert(bytes("INVALID LABEL"));
+		vm.prank(invalidBidder);
         registrar.reveal(invalidId, "Alice", bidWei, salt);
     }
 
     function test_RevealChecksBidLimits() public {
-        uint256 zeroId    = _commitBid("zero", 0);
-        uint256 largeId   = _commitBid("large", deposit + 1);
-        uint256 minimumId = _commitBid("minimum", 1);
-        uint256 maximumId = _commitBid("maximum", deposit);
+        uint256 zeroId    = _commitAs(address(123), "zero", 0);
+        uint256 largeId   = _commitAs(address(124), "large", deposit + 1);
+        uint256 minimumId = _commitAs(address(125), "minimum", 1);
+        uint256 maximumId = _commitAs(address(126), "maximum", deposit);
 
         vm.warp(registrar.getRound(1).startTime + 120);
 
-        assertFalse(registrar.reveal(zeroId, "zero", 0, salt));
-        assertFalse(registrar.reveal(largeId, "large", deposit + 1, salt));
+		vm.expectRevert(bytes("INVALID BID"));
+		vm.prank(address(123));
+		registrar.reveal(zeroId, "zero", 0, salt);
+		vm.expectRevert(bytes("INVALID BID"));
+		vm.prank(address(124));
+		registrar.reveal(largeId, "large", deposit + 1, salt);
         assertFalse(registrar.getCommitment(zeroId).valid);
         assertFalse(registrar.getCommitment(largeId).valid);
 
+		vm.prank(address(125));
         assertTrue(registrar.reveal(minimumId, "minimum", 1, salt));
+		vm.prank(address(126));
         assertTrue(registrar.reveal(maximumId, "maximum", deposit, salt));
-        assertTrue(registrar.getCommitment(zeroId).revealed);
-        assertTrue(registrar.getCommitment(largeId).revealed);
+        assertFalse(registrar.getCommitment(zeroId).revealed);
+        assertFalse(registrar.getCommitment(largeId).revealed);
+		assertEq(registrar.getRound(1).pendingDomainCount, 2);
     }
 
     function test_CopiedHashCannotBeRevealedByAnotherBidder() public {
@@ -184,4 +199,11 @@ contract DomainRegistrarRevealTest is Test {
         );
         return registrar.commit{value: deposit}(1, digest);
     }
+
+	function _commitAs(address bidder, string memory label, uint256 amount) internal returns (uint256) {
+		vm.deal(bidder, deposit);
+		bytes32 digest = registrar.computeCommitment(1, bidder, label, amount, salt);
+		vm.prank(bidder);
+		return registrar.commit{value: deposit}(1, digest);
+	}
 }
