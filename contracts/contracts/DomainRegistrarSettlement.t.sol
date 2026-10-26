@@ -22,6 +22,7 @@ contract DomainRegistrarSettlementTest is Test {
 
     function setUp() public {
         registrar = new DomainRegistrar();
+        registrar.startRound();
         deposit   = registrar.COMMIT_DEPOSIT();
         salt      = bytes32(uint256(123));
 
@@ -35,7 +36,7 @@ contract DomainRegistrarSettlementTest is Test {
         invalidId    = _commitBid(carol, "invalid", 0);
         unrevealedId = _commitBid(dave, "unopened", 0.003 ether);
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
 
         vm.prank(alice);assertTrue(registrar.reveal(aliceId, "alice", 0.004 ether, salt));
         vm.prank(bob);assertTrue(registrar.reveal(bobId, "alice", 0.006 ether, salt));
@@ -45,7 +46,7 @@ contract DomainRegistrarSettlementTest is Test {
     }
 
     function test_SettlementStartsAt240SecondsAndCreditsWinner() public {
-        uint256 start = registrar.auctionStart();
+        uint256 start = registrar.getRound(1).startTime;
 
         vm.warp(start + 239);
         vm.expectRevert(bytes("ROUND NOT ENDED"));
@@ -76,7 +77,7 @@ contract DomainRegistrarSettlementTest is Test {
     }
 
     function test_ValidLoserGetsFullDeposit() public {
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
 
         (uint256 refund, uint256 proceeds) = registrar.settleCommit(aliceId);
 
@@ -92,7 +93,7 @@ contract DomainRegistrarSettlementTest is Test {
     }
 
     function test_InvalidRevealGetsFullDeposit() public {
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
 
         (uint256 refund, uint256 proceeds) = registrar.settleCommit(invalidId);
 
@@ -111,7 +112,7 @@ contract DomainRegistrarSettlementTest is Test {
     }
 
     function test_UnrevealedDepositBecomesTreasuryCredit() public {
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
 
         vm.prank(outsider);
         (uint256 refund, uint256 proceeds) = registrar.settleCommit(unrevealedId);
@@ -130,7 +131,7 @@ contract DomainRegistrarSettlementTest is Test {
     }
 
     function test_RejectsUnknownAndRepeatedSettlement() public {
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
 
         uint256 unknownId = registrar.commitmentCount() + 1;
 
@@ -153,7 +154,7 @@ contract DomainRegistrarSettlementTest is Test {
     }
 
     function test_CanSettleBeforeFinalizing() public {
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
 
         registrar.settleCommit(bobId);
         assertEq(registrar.resolve("alice"), address(0));
@@ -168,7 +169,7 @@ contract DomainRegistrarSettlementTest is Test {
     }
 
     function test_CanSettleAfterFinalizing() public {
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
 
         registrar.finalizeName("alice");
         registrar.settleCommit(bobId);
@@ -181,7 +182,13 @@ contract DomainRegistrarSettlementTest is Test {
     }
 
     function test_AllDepositsRemainAccountedForInLaterRound() public {
-        vm.warp(registrar.auctionStart() + 977);
+        // Explicitly start rounds 2-5 while the original round's work remains pending.
+        for (uint256 i = 0; i < 4; ++i) {
+            uint256 deadline = registrar.getRound(registrar.getCurrentRound()).revealEnd;
+            vm.warp(deadline);
+            registrar.startRound();
+        }
+        vm.warp(registrar.getRound(1).startTime + 977);
 
         assertEq(registrar.getCurrentRound(), 5);
 

@@ -72,6 +72,7 @@ contract DomainRegistrarWithdrawalTest is Test {
         // note that this receiver creates the registrar so it becomes its treasury
         treasuryReceiver = new WithdrawalReceiver(DomainRegistrar(address(0)));
         registrar        = treasuryReceiver.registrar();
+        registrar.startRound();
         refundReceiver   = new WithdrawalReceiver(registrar);
         deposit          = registrar.COMMIT_DEPOSIT();
         salt             = bytes32(uint256(123));
@@ -84,7 +85,7 @@ contract DomainRegistrarWithdrawalTest is Test {
         uint256 bobId      = _commitBid(1, bob,   "alice", 0.006 ether);
         uint256 receiverId = _commitBid(1, address(refundReceiver), "alice", 0.003 ether);
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
 
         vm.prank(alice);
         assertTrue(registrar.reveal(aliceId,    "alice", 0.004 ether, salt));
@@ -93,7 +94,7 @@ contract DomainRegistrarWithdrawalTest is Test {
         vm.prank(address(refundReceiver));
         assertTrue(registrar.reveal(receiverId, "alice", 0.003 ether, salt));
 
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
         registrar.settleCommit(aliceId);
         registrar.settleCommit(bobId);
         registrar.settleCommit(receiverId);
@@ -151,6 +152,7 @@ contract DomainRegistrarWithdrawalTest is Test {
     }
 
     function test_TreasuryCannotWithdrawRefundsOrLockedDeposits() public {
+        registrar.startRound();
         _commitBid(2, alice, "later", 0.003 ether);
         uint256 refundsBefore = registrar.totalRefundCredits();
         uint256 balanceBefore = address(registrar).balance;

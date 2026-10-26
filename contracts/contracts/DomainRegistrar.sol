@@ -3,7 +3,7 @@
 // COMMENTARY
 // - note that a smart contract groups functions and data and when it is deployed it will live at an ETH address
 // - note that hardhat compiles and tests that program
-// - for now our contract only has one job where it will receive a label and answer whether it follows our naming rules and conventions
+// - this registrar manages domain auctions, ownership, resolution and checked ETH payments
 
 pragma solidity 0.8.34;
 
@@ -23,6 +23,14 @@ contract DomainRegistrar {
         uint256 revealEnd;
         Phase   phase;
     }
+
+	// These timestamps are stored when a round is explicitly started.
+	// getRound() adds the phase calculated from the current block timestamp.
+	struct RoundSchedule {
+		uint256 startTime;
+		uint256 commitEnd;
+		uint256 revealEnd;
+	}
 
     struct CommitmentInfo {
         address bidder;
@@ -55,7 +63,8 @@ contract DomainRegistrar {
     uint256 public constant  COMMIT_DURATION = 120 seconds;
     uint256 public constant  REVEAL_DURATION = 120 seconds;
     uint256 public constant  ROUNDS_DURATION = COMMIT_DURATION + REVEAL_DURATION;
-    uint256 public immutable auctionStart;
+	uint256 private _latestRoundId;
+	mapping(uint256 => RoundSchedule) private _rounds;
 
     uint256 public constant COMMIT_DEPOSIT = 0.01 ether;
     uint256 public commitmentCount;
@@ -71,6 +80,14 @@ contract DomainRegistrar {
     mapping(bytes32 => AuctionInfo)    private _auctions;
     mapping(bytes32 => DomainInfo)     private _domains;
     mapping(address => uint256)        public refundCredits;
+
+	event RoundStarted(
+		uint256 indexed roundId,
+		address indexed starter,
+		uint256 startTime,
+		uint256 commitEnd,
+		uint256 revealEnd
+	);
 
     event CommitmentSubmitted(
         uint256 indexed commitmentId,
@@ -131,9 +148,28 @@ contract DomainRegistrar {
     );
 
     constructor() {
-        auctionStart = block.timestamp;
         treasury = msg.sender;
     }
+
+	function startRound() external returns (uint256 roundId) {
+		if (_latestRoundId != 0) {
+			require(
+				block.timestamp >= _rounds[_latestRoundId].revealEnd,
+				"ROUND NOT ENDED"
+			);
+		}
+
+		roundId = _latestRoundId + 1;
+		uint256 startTime = block.timestamp;
+		uint256 commitEnd = startTime + COMMIT_DURATION;
+		uint256 revealEnd = commitEnd + REVEAL_DURATION;
+
+		_rounds[roundId] = RoundSchedule(startTime, commitEnd, revealEnd);
+		_latestRoundId = roundId;
+
+		emit RoundStarted(roundId, msg.sender, startTime, commitEnd, revealEnd);
+		return roundId;
+	}
 
     modifier nonReentrant() {
         require(!_withdrawing, "REENTRANT WITHDRAWAL");
@@ -143,8 +179,9 @@ contract DomainRegistrar {
     }
 
     function commit(uint256 roundId , bytes32 digest) external payable returns (uint256 commitmentId) {
-        require(roundId == getCurrentRound(), "WRONG ROUND");
-        require(getRound(roundId).phase == Phase.Commit, "NOT COMMIT PHASE");
+		RoundInfo memory round = getRound(roundId);
+		require(roundId == _latestRoundId, "WRONG ROUND");
+		require(round.phase == Phase.Commit, "NOT COMMIT PHASE");
         require(msg.value == COMMIT_DEPOSIT, "INCORRECT DEPOSIT");
         require(digest != bytes32(0), "EMPTY COMMITMENT");
 
@@ -382,16 +419,17 @@ contract DomainRegistrar {
     }
 
     function getCurrentRound() public view returns (uint256) {
-        uint256 elapsed = block.timestamp - auctionStart;
-        return (elapsed / ROUNDS_DURATION) + 1;  // ofc when you divide by integers it drops the fractional part so we need to add 1 to get the round
+		// This is the latest started round, including while it is already ended.
+		return _latestRoundId;
     }
 
     function getRound(uint256 roundId) public view returns (RoundInfo memory info) {
-        require(roundId > 0 , "INVALID ROUND");
+		require(roundId > 0 && roundId <= _latestRoundId, "INVALID ROUND");
 
-        info.startTime = auctionStart + (roundId - 1) * ROUNDS_DURATION;
-        info.commitEnd = info.startTime + COMMIT_DURATION;
-        info.revealEnd = info.commitEnd + REVEAL_DURATION;
+		RoundSchedule storage schedule = _rounds[roundId];
+		info.startTime = schedule.startTime;
+		info.commitEnd = schedule.commitEnd;
+		info.revealEnd = schedule.revealEnd;
 
         if (block.timestamp < info.startTime) {
             info.phase = Phase.NotStarted;

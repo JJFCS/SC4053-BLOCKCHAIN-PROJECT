@@ -87,6 +87,7 @@ contract DomainRegistrarPaymentsTest is Test {
     function setUp() public {
         treasuryReceiver = new DomainPaymentReceiver(DomainRegistrar(address(0)));
         registrar        = treasuryReceiver.registrar();
+        registrar.startRound();
         paymentReceiver  = new DomainPaymentReceiver(registrar);
         deposit          = registrar.COMMIT_DEPOSIT();
         salt             = bytes32(uint256(123));  // note that fixed salt is for these local tests only
@@ -104,7 +105,7 @@ contract DomainRegistrarPaymentsTest is Test {
         uint256 treasuryId = _commitBid(address(treasuryReceiver), "alice", 0.002 ether);
         uint256 pendingId  = _commitBid(pendingBidder, "pending", 0.005 ether);
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
         vm.prank(owner);
         assertTrue(registrar.reveal(winningId,  "alice",   WINNING_BID, salt));
         vm.prank(loser);
@@ -116,7 +117,7 @@ contract DomainRegistrarPaymentsTest is Test {
         vm.prank(pendingBidder);
         assertTrue(registrar.reveal(pendingId,  "pending", 0.005 ether, salt));
 
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
         registrar.finalizeName("alice");
         registrar.settleCommit(winningId);
         registrar.settleCommit(loserId);

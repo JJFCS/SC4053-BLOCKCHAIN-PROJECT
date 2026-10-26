@@ -8,6 +8,8 @@ async function registerName() {
     const [treasury, owner, payer, recipient] = await ethers.getSigners();
     const registrar = await ethers.deployContract("DomainRegistrar");
     await registrar.waitForDeployment();
+    const startTransaction = await registrar.startRound();
+    await startTransaction.wait();
 
     const label        = "alice";
     const roundId      = 1n;

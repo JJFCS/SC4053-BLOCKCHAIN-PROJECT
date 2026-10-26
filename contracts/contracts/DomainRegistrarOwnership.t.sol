@@ -17,6 +17,7 @@ contract DomainRegistrarOwnershipTest is Test {
 
     function setUp() public {
         registrar = new DomainRegistrar();
+        registrar.startRound();
         deposit   = registrar.COMMIT_DEPOSIT();
         salt      = bytes32(uint256(123));
 
@@ -26,7 +27,7 @@ contract DomainRegistrarOwnershipTest is Test {
         uint256 aliceId = _commitBid(1, alice, "alice", 0.004 ether);
         winningId       = _commitBid(1, bob,   "alice", 0.006 ether);
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
 
         vm.prank(alice);
         assertTrue(registrar.reveal(aliceId,   "alice", 0.004 ether, salt));
@@ -44,7 +45,7 @@ contract DomainRegistrarOwnershipTest is Test {
     }
 
     function test_FinalizationStartsAt240Seconds() public {
-        uint256 start = registrar.auctionStart();
+        uint256 start = registrar.getRound(1).startTime;
 
         vm.warp(start + 239);
 
@@ -72,7 +73,7 @@ contract DomainRegistrarOwnershipTest is Test {
     }
 
     function test_AnyoneCanFinalizeForWinningBidder() public {
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
         vm.prank(outsider);
         address owner = registrar.finalizeName("alice");
 
@@ -81,7 +82,7 @@ contract DomainRegistrarOwnershipTest is Test {
     }
 
     function test_RejectsSecondFinalization() public {
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
         registrar.finalizeName("alice");
         vm.expectRevert(bytes("ALREADY FINALIZED"));
         registrar.finalizeName("alice");
@@ -89,7 +90,7 @@ contract DomainRegistrarOwnershipTest is Test {
     }
 
     function test_RejectsInvalidAndUnknownNames() public {
-        vm.warp(registrar.auctionStart() + 240);
+        vm.warp(registrar.getRound(1).startTime + 240);
 
         vm.expectRevert(bytes("INVALID LABEL"));
         registrar.finalizeName("Alice");
@@ -104,7 +105,13 @@ contract DomainRegistrarOwnershipTest is Test {
     }
 
     function test_CanFinalizeAnOlderRound() public {
-        vm.warp(registrar.auctionStart() + 977);
+        // Explicitly start rounds 2-5 while the original round's work remains pending.
+        for (uint256 i = 0; i < 4; ++i) {
+            uint256 deadline = registrar.getRound(registrar.getCurrentRound()).revealEnd;
+            vm.warp(deadline);
+            registrar.startRound();
+        }
+        vm.warp(registrar.getRound(1).startTime + 977);
 
         assertEq(registrar.getCurrentRound(), 5);
 
@@ -115,10 +122,11 @@ contract DomainRegistrarOwnershipTest is Test {
     }
 
     function test_RegisteredNameCannotBeTakenByLaterRound() public {
-        uint256 start = registrar.auctionStart();
+        uint256 start = registrar.getRound(1).startTime;
 
         vm.warp(start + 240);
         registrar.finalizeName("alice");
+        registrar.startRound();
 
         uint256 laterId = _commitBid(2, alice, "alice", 0.009 ether);
 
@@ -138,7 +146,8 @@ contract DomainRegistrarOwnershipTest is Test {
     function test_WithoutValidRevealThereIsNoOwner() public {
         // use another registrar to test names without a valid reveal
         DomainRegistrar otherRegistrar = new DomainRegistrar();
-        uint256 start = otherRegistrar.auctionStart();
+        otherRegistrar.startRound();
+        uint256 start = otherRegistrar.getRound(1).startTime;
 
         bytes32 unopenedDigest = otherRegistrar.computeCommitment(1, alice, "unopened", 0.004 ether, salt);
         bytes32 invalidDigest = otherRegistrar.computeCommitment(1, alice, "invalid", 0, salt);

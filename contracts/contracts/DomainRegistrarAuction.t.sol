@@ -17,6 +17,7 @@ contract DomainRegistrarAuctionTest is Test {
 
     function setUp() public {
         registrar = new DomainRegistrar();
+        registrar.startRound();
         deposit   = registrar.COMMIT_DEPOSIT();
         salt      = bytes32(uint256(123));
 
@@ -36,7 +37,7 @@ contract DomainRegistrarAuctionTest is Test {
     function test_FirstValidRevealSetsLeader() public {
         uint256 id = _commitBid(1, alice, "alice", 0.004 ether);
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
         assertTrue(_revealBid(id, alice, "alice", 0.004 ether));
 
         DomainRegistrar.AuctionInfo memory auction = registrar.getAuction("alice");
@@ -52,7 +53,7 @@ contract DomainRegistrarAuctionTest is Test {
         uint256 bobId   = _commitBid(1, bob,   "alice", 0.006 ether);
         uint256 carolId = _commitBid(1, carol, "alice", 0.003 ether);
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
 
         assertTrue(_revealBid(aliceId, alice, "alice", 0.004 ether));
         assertTrue(_revealBid(bobId,   bob,   "alice", 0.006 ether));
@@ -76,7 +77,7 @@ contract DomainRegistrarAuctionTest is Test {
         uint256 aliceId = _commitBid(1, alice, "alice", 0.004 ether);
         uint256 bobId   = _commitBid(1, bob,   "alice", 0.004 ether);
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
 
         // here bob will be revealed first but alice commited earlier
         assertTrue(_revealBid(bobId,   bob,   "alice", 0.004 ether));
@@ -90,7 +91,7 @@ contract DomainRegistrarAuctionTest is Test {
         uint256 aliceId = _commitBid(1, alice, "alice", 0.004 ether);
         uint256 bobId   = _commitBid(1, bob,   "alice", 0.004 ether);
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
 
         assertTrue(_revealBid(aliceId, alice, "alice", 0.004 ether));
         assertTrue(_revealBid(bobId,   bob,   "alice", 0.004 ether));
@@ -102,7 +103,7 @@ contract DomainRegistrarAuctionTest is Test {
         uint256 aliceId = _commitBid(1, alice, "alice", 0.004 ether);
         uint256 bobId   = _commitBid(1, bob,    "bob",  0.006 ether);
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
 
         assertTrue(_revealBid(aliceId, alice, "alice", 0.004 ether));
         assertTrue(_revealBid(bobId,   bob,   "bob",   0.006 ether));
@@ -117,7 +118,7 @@ contract DomainRegistrarAuctionTest is Test {
         uint256 largeId     = _commitBid(1, alice, "alice", deposit + 1);
         uint256 validId     = _commitBid(1, bob,   "alice", 0.004 ether);
 
-        vm.warp(registrar.auctionStart() + 120);
+        vm.warp(registrar.getRound(1).startTime + 120);
 
         assertFalse(_revealBid(uppercaseId, alice, "Alice", 0.004 ether));
         assertEq(registrar.getAuction("Alice").roundId, 0);
@@ -132,12 +133,13 @@ contract DomainRegistrarAuctionTest is Test {
 
     function test_LaterRoundCannotReplaceReservedName() public {
         uint256 firstId = _commitBid(1, alice, "alice", 0.004 ether);
-        uint256 start   = registrar.auctionStart();
+        uint256 start   = registrar.getRound(1).startTime;
 
         vm.warp(start + 120);
         assertTrue(_revealBid(firstId, alice, "alice", 0.004 ether));
 
         vm.warp(start + 240);
+        registrar.startRound();
         uint256 laterId = _commitBid(2, bob,  "alice", 0.009 ether);
 
         vm.warp(start + 360);
@@ -157,10 +159,11 @@ contract DomainRegistrarAuctionTest is Test {
     function test_UnrevealedBidDoesNotReserveName() public {
         _commitBid(1, alice, "alice", 0.004 ether);
 
-        uint256 start = registrar.auctionStart();
+        uint256 start = registrar.getRound(1).startTime;
 
         // we need to make sure no one reveals in round 1
         vm.warp(start + 240);
+        registrar.startRound();
         uint256 laterId = _commitBid(2, bob, "alice", 0.006 ether);
 
         vm.warp(start + 360);
