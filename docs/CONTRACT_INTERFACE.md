@@ -2,7 +2,6 @@
 
 Contract revision: cb1f3c4b5bbc04326804089d30991dc69c6a2f60 (PR #11).
 Specification: v0.5, reproduced in docs/SPEC.md.
-The handoff patch changes specification/interface files and adds an ABI export utility.
 The ABI below comes directly from the Solidity 0.8.34 compiler artifact.
 
 ## Start here

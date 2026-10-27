@@ -8,12 +8,12 @@ their outputs were supplied separately on 27 October.
 
 ## Inputs and preservation
 
-- Main archive comment: `cb1f3c4b5bbc04326804089d30991dc69c6a2f60`.
+- Main archive commit: `cb1f3c4b5bbc04326804089d30991dc69c6a2f60`.
 - Current frontend/integration base: `16decbda349a26e0a8bd44eb4e216b6edd2e4b70`.
 - Historical frontend archive: `7217ac7cd96be3813ba372c75f2bf3f8e042e9c2`.
 - The complete Git bundle accounts for all 13 remote branch heads; all eleven contract feature tips are included in main.
-- A's handoff patch and its four proposed files match its manifest hashes.
-- The main contract and original lockfile match A's hashes after CRLF-to-LF
+- The interface patch and its four files match the recorded manifest hashes.
+- The main contract and original lockfile match the recorded hashes after CRLF-to-LF
   normalization. The Windows ZIP contains CRLF line endings.
 - `DomainRegistrar.sol` is unchanged in this package. Its normalized SHA-256 is
   `eda56c304c579d9c167550521279008830b4528169042442da05a94c9edabf89`.
@@ -28,7 +28,7 @@ their outputs were supplied separately on 27 October.
 | --- | --- |
 | Original contract dependency install | Passed: 208 packages, Hardhat 3.18.0. |
 | Original complete suite | 176 passed: 153 Solidity, 23 Mocha. |
-| Specification/interface handoff application | Patch check and application passed in the working copy. |
+| Specification/interface integration | Patch check and application passed in the working copy. |
 | Expanded build/export/typecheck/tests | Passed; 179 tests: 153 Solidity, 26 Mocha. |
 | Fresh installation of the updated lockfile | Passed: npm ci installed 224 packages. |
 | Additional integration coverage | Compiler ABI equality/canonical fields; deployment-evidence validation and mismatch rejection; complete user flow through the published ABI. |

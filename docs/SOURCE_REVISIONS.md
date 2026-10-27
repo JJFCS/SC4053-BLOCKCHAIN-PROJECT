@@ -1,8 +1,8 @@
 # Source revisions and branch coverage
 
-Snapshot: the uploaded complete Git bundle, captured on 27 October 2026.
-The supplied Git status was clean. The bundle contains committed files/history;
-it does not contain future pushes, external chat histories, or uncommitted work.
+Snapshot: complete Git bundle captured on 27 October 2026.
+The bundle contains committed files and history through that snapshot;
+it excludes later pushes and uncommitted work.
 
 | Branch | Revision | Included in main |
 | --- | --- | --- |

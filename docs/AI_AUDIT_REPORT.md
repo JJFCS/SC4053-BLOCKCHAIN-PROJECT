@@ -32,10 +32,9 @@ ownership and credit; browser state supports input, wallet operations and recove
 
 ## 2. Development Methodology & AI Tooling Infrastructure
 
-The working division is A for contracts and initial tests, B for frontend/wallet
-integration, and C for independent validation, deployment and audit coordination.
-Actual contributions should be described in the final group report; this split
-is a team workflow rather than a separately assigned course rubric.
+The work spans contract implementation, frontend integration, independent
+validation, deployment and documentation. Final contribution details should be
+checked against the team's actual work.
 
 The independent validation used ChatGPT/Codex to inspect the supplied code, follow the repository's
 Hardhat skills, prepare scripts/tests/docs, execute validation in an isolated
@@ -44,7 +43,7 @@ New work was prepared in a separate copy and exported as a reviewable patch.
 
 Infrastructure consists of:
 
-- `docs/SPEC.md` and the compiler-generated ABI/interface guide from A's handoff.
+- `docs/SPEC.md`, the compiler-generated ABI and the contract interface guide.
 - Repository `hardhat` and `hardhat-toolbox-mocha-ethers` skills for the actual
   Hardhat 3 API, test layers and build-before-typecheck workflow.
 - `scripts/validate.mjs` for ordered build, ABI export, typecheck and tests with
@@ -54,8 +53,8 @@ Infrastructure consists of:
 - An archived-handler audit harness which connects the unchanged historical
   frontend module to a real simulated EVM through an EIP-1193 bridge.
 
-A/B's exact generation tools/models and prompt chains were not included in the
-handoff. Repository instruction files do not establish which assistant anyone used.
+The repository records source and tests, but it does not establish every tool
+or model used during earlier development.
 
 ## 3. Specification Engineering & Prompt Logs
 
@@ -63,15 +62,14 @@ The formal specification defines contract state transitions, deadline boundaries
 accounting, canonical function inputs, browser recovery and acceptance criteria.
 This gives code generation and subsequent review a shared set of observable rules.
 
-The supplied context for the independent validation included the project brief,
-the v0.5 specification, repository snapshots, package/config files, existing
-tests, and the contract interface handoff. Original A/B prompt records are
-unavailable in the reviewed materials.
+The technical context for validation included the project brief, v0.5
+specification, source revisions, package/config files, existing tests, and the
+compiled ABI and interface guide.
 
-Review proceeded in iterations: establish source revisions, run original checks,
-incorporate the handoff, add deployment/integration tools, reproduce frontend
-failures, review dependency advisories, and rerun affected checks after compatible
-dependency changes. Raw results are stored independently of the narrative.
+Validation proceeded in iterations: establish source revisions, run original
+checks, add deployment/integration tools, reproduce frontend failures, review
+dependency advisories, and rerun affected checks after compatible dependency
+changes. Raw results are stored independently of the narrative.
 
 ## 4. AI-Generated Architecture
 
@@ -90,7 +88,7 @@ The current frontend uses React/Vite and ethers BrowserProvider. Commit 66b12a2
 adds explicit-round, settlement and resolution screens; merge 16decbd includes
 main's current contracts. Its ABI bindings correct several earlier assumptions.
 Recovery, expected-chain enforcement and recipient-confirmation gaps remain.
-The handoff supplies the 48-entry compiled ABI and precise interface guide.
+The compiled ABI contains 48 entries and is documented in `CONTRACT_INTERFACE.md`.
 
 ## 5. Problems Discovered & Vulnerability Analysis
 
@@ -99,7 +97,7 @@ verification are in `FRONTEND_FINDINGS.md`.
 
 | ID | Finding | Evidence/status |
 | --- | --- | --- |
-| DOC-01 | Main's specification was a heading; ABI/interface handoff absent. | Resolved in working copy by incorporating A's handoff; ABI equality checked. |
+| DOC-01 | Main's specification was a heading; compiled ABI/interface guide absent. | Resolved by adding the specification, ABI and interface guide; ABI equality checked. |
 | DEPLOY-01 | Only the Counter example was deployable through the supplied module. | Registrar deployment/verification added, exercised over local HTTP RPC, then deployed and verified on Sepolia. |
 | FE-01 | Current build fails on unused icon/orphan component imports. | Repaired and production build verified; before/after logs retained. |
 | FE-02 | Historical short-name mismatch. | Fixed in 16decbd; current handler check passed. |
@@ -115,11 +113,12 @@ verification are in `FRONTEND_FINDINGS.md`.
 
 No additional reproducible contract-logic vulnerability was identified in this
 pass. This does not establish the absence of vulnerabilities. Existing adversarial
-tests were rerun, while C added interface, evidence-binding and complete-flow checks.
+tests were rerun, and the validation added interface, evidence-binding and
+complete-flow checks.
 
 For the major frontend findings, the likely causes are version drift or missing
-integration context. These are inferences from the supplied versions and source;
-the exact model decision cannot be reconstructed without the original prompts.
+integration context. These are inferences from the reviewed versions and source;
+no specific cause is attributed to a model without direct evidence.
 Pending fixes are not described as successful remediation. DEP-01 is a developer
 dependency finding and is not presented as a demonstrated on-chain funds exploit.
 

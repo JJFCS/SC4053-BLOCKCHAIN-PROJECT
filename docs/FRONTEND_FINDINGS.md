@@ -35,9 +35,8 @@ TypeScript/Vite production build then passed. Before/after evidence is retained
 in recorded-run/frontend-latest-build.log and frontend-build-fixed.log.
 The remaining large-chunk warning is not a build failure.
 
-Likely cause (inference): unused generated component boilerplate was integrated
-without a successful production build. No original generation prompt is available
-to establish the exact model reasoning.
+Likely cause (inference): an unused component was included without a successful
+production build. The source does not establish why it was introduced.
 
 ## FE-06: explicit recipient preview/confirmation remains incomplete
 
@@ -108,6 +107,6 @@ is pending.
 The optional audit:frontend-history command deliberately reproduces old failures.
 Current handler successes do not close the remaining browser findings. Use
 BROWSER_ACCEPTANCE.md and REQUIREMENTS_COVERAGE.md to record actual results after
-changes. Proposed causes are inferences from source/version differences, not
-claims about unseen AI prompts. Historical findings are not attributed to the
-current code where a fix has been verified.
+changes. Proposed causes are inferences from source/version differences.
+Historical findings are not attributed to current code where a fix has been
+verified.
