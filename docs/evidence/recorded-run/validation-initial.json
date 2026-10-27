@@ -1,0 +1,11 @@
+{
+  "name": "c-validation",
+  "cwd": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts",
+  "command": [
+    "node",
+    "scripts/validate.mjs"
+  ],
+  "startedAt": "2026-10-27T04:51:10.947489+00:00",
+  "endedAt": "2026-10-27T04:51:14.952980+00:00",
+  "exitCode": 0
+}

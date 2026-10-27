@@ -1,0 +1,4 @@
+# Keep the archived audit input byte-for-byte, including its original line endings.
+contracts/test/fixtures/frontend-handlers-*.ts.txt binary
+# Preserve captured terminal output, including intentional blank lines at EOF.
+docs/evidence/** -whitespace

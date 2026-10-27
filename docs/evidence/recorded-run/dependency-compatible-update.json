@@ -1,0 +1,14 @@
+{
+  "name": "dependency-compatible-update",
+  "cwd": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts",
+  "command": [
+    "npm",
+    "audit",
+    "fix",
+    "--ignore-scripts",
+    "--no-fund"
+  ],
+  "startedAt": "2026-10-27T04:57:29.391913+00:00",
+  "endedAt": "2026-10-27T04:57:48.973787+00:00",
+  "exitCode": 1
+}

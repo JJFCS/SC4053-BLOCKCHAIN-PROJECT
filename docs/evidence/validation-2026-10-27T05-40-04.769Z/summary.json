@@ -1,0 +1,53 @@
+{
+  "recordedAt": "2026-10-27T05:40:04.775Z",
+  "node": "v24.22.1",
+  "platform": "linux",
+  "gitRevision": "16decbda349a26e0a8bd44eb4e216b6edd2e4b70",
+  "sourceBaseRevision": "cb1f3c4b5bbc04326804089d30991dc69c6a2f60",
+  "contractSourceSha256": "eda56c304c579d9c167550521279008830b4528169042442da05a94c9edabf89",
+  "checks": [
+    {
+      "name": "build",
+      "command": [
+        "node",
+        "node_modules/hardhat/dist/src/cli.js",
+        "build"
+      ],
+      "startedAt": "2026-10-27T05:40:04.777Z",
+      "endedAt": "2026-10-27T05:40:05.499Z",
+      "exitCode": 0
+    },
+    {
+      "name": "export-abi",
+      "command": [
+        "node",
+        "scripts/export-registrar-abi.mjs"
+      ],
+      "startedAt": "2026-10-27T05:40:05.500Z",
+      "endedAt": "2026-10-27T05:40:05.588Z",
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "--noEmit"
+      ],
+      "startedAt": "2026-10-27T05:40:05.589Z",
+      "endedAt": "2026-10-27T05:40:06.820Z",
+      "exitCode": 0
+    },
+    {
+      "name": "tests",
+      "command": [
+        "node",
+        "node_modules/hardhat/dist/src/cli.js",
+        "test"
+      ],
+      "startedAt": "2026-10-27T05:40:06.820Z",
+      "endedAt": "2026-10-27T05:40:08.997Z",
+      "exitCode": 0
+    }
+  ]
+}

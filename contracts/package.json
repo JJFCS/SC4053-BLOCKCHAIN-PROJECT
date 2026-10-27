@@ -16,5 +16,16 @@
     "hardhat": "^3.18.0",
     "mocha": "^12.0.2",
     "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "build": "hardhat build",
+    "test": "hardhat test",
+    "typecheck": "tsc --noEmit",
+    "deploy:local": "hardhat run scripts/deploy-registrar.ts --network localhost",
+    "verify:local": "hardhat run scripts/verify-deployment.ts --network localhost",
+    "smoke:local": "hardhat run scripts/smoke-local.ts --network localhost",
+    "validate": "node scripts/validate.mjs",
+    "check:frontend": "hardhat run scripts/check-frontend.ts",
+    "audit:frontend-history": "hardhat run scripts/reproduce-frontend-history.ts"
   }
 }

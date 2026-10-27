@@ -1,0 +1,16 @@
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+An unexpected error occurred:
+
+AssertionError [ERR_ASSERTION]: Treasury must be nonzero
+    at <anonymous> (/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/scripts/deploy-registrar.ts:19:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: '0x0000000000000000000000000000000000000000',
+  expected: '0x0000000000000000000000000000000000000000',
+  operator: 'notStrictEqual',
+  diff: 'simple'
+}
+
+If you think this is a bug in Hardhat, please report it here: https://hardhat.org/report-bug

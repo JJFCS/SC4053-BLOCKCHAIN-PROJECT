@@ -1,0 +1,21 @@
+{
+  "name": "fresh-locked-install",
+  "cwd": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts",
+  "command": [
+    "npm",
+    "ci",
+    "--no-audit",
+    "--no-fund",
+    "--fetch-retries=0",
+    "--fetch-timeout=20000"
+  ],
+  "startedAt": "2026-10-27T05:04:26.014800+00:00",
+  "endedAt": "2026-10-27T05:04:36.825437+00:00",
+  "exitCode": 0
+}
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated glob@7.1.7: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+added 224 packages in 11s

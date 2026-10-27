@@ -1,0 +1,11 @@
+{
+  "name": "fresh-install-validation",
+  "cwd": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts",
+  "command": [
+    "node",
+    "scripts/validate.mjs"
+  ],
+  "startedAt": "2026-10-27T05:06:07.778633+00:00",
+  "endedAt": "2026-10-27T05:06:12.133905+00:00",
+  "exitCode": 0
+}

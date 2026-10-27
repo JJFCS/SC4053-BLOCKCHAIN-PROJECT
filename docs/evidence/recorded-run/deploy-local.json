@@ -1,0 +1,16 @@
+{
+  "name": "deploy-local",
+  "cwd": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts",
+  "command": [
+    "npx",
+    "--no-install",
+    "hardhat",
+    "run",
+    "scripts/deploy-registrar.ts",
+    "--network",
+    "localhost"
+  ],
+  "startedAt": "2026-10-27T05:41:56.536959+00:00",
+  "endedAt": "2026-10-27T05:41:57.747024+00:00",
+  "exitCode": 0
+}

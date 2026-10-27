@@ -1,0 +1,96 @@
+{
+  "name": "dependency-compatible-update",
+  "cwd": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts",
+  "command": [
+    "npm",
+    "audit",
+    "fix",
+    "--ignore-scripts",
+    "--no-fund"
+  ],
+  "startedAt": "2026-10-27T04:57:29.391913+00:00",
+  "endedAt": "2026-10-27T04:57:48.973787+00:00",
+  "exitCode": 1
+}
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+added 34 packages, removed 19 packages, changed 16 packages, and audited 224 packages in 19s
+
+# npm audit report
+
+zod  <4.6.6
+Severity: high
+Zod can exhaust memory while validating oversized constrained collections - https://github.com/advisories/GHSA-mrhx-c7xc-m3w5
+fix available via `npm audit fix --force`
+Will install @nomicfoundation/hardhat-ignition@0.15.16, which is a breaking change
+node_modules/zod
+  @nomicfoundation/hardhat-ethers  >=4.0.0-next.0
+  Depends on vulnerable versions of @nomicfoundation/hardhat-zod-utils
+  Depends on vulnerable versions of hardhat
+  Depends on vulnerable versions of zod
+  node_modules/@nomicfoundation/hardhat-ethers
+  @nomicfoundation/hardhat-keystore  *
+  Depends on vulnerable versions of @nomicfoundation/hardhat-zod-utils
+  Depends on vulnerable versions of hardhat
+  Depends on vulnerable versions of zod
+  node_modules/@nomicfoundation/hardhat-keystore
+  @nomicfoundation/hardhat-mocha  *
+  Depends on vulnerable versions of @nomicfoundation/hardhat-zod-utils
+  Depends on vulnerable versions of hardhat
+  Depends on vulnerable versions of zod
+  node_modules/@nomicfoundation/hardhat-mocha
+  @nomicfoundation/hardhat-typechain  *
+  Depends on vulnerable versions of @nomicfoundation/hardhat-zod-utils
+  Depends on vulnerable versions of hardhat
+  Depends on vulnerable versions of zod
+  node_modules/@nomicfoundation/hardhat-typechain
+  @nomicfoundation/hardhat-verify  >=3.0.0-next.13
+  Depends on vulnerable versions of @nomicfoundation/hardhat-zod-utils
+  Depends on vulnerable versions of hardhat
+  Depends on vulnerable versions of zod
+  node_modules/@nomicfoundation/hardhat-verify
+  @nomicfoundation/hardhat-zod-utils  *
+  Depends on vulnerable versions of zod
+  node_modules/@nomicfoundation/hardhat-zod-utils
+  hardhat  >=3.0.0-next.0
+  Depends on vulnerable versions of @nomicfoundation/hardhat-zod-utils
+  Depends on vulnerable versions of zod
+  node_modules/hardhat
+    @nomicfoundation/hardhat-ethers-chai-matchers  *
+    Depends on vulnerable versions of hardhat
+    node_modules/@nomicfoundation/hardhat-ethers-chai-matchers
+    @nomicfoundation/hardhat-ignition  >=3.0.0-next.0
+    Depends on vulnerable versions of @nomicfoundation/hardhat-verify
+    Depends on vulnerable versions of hardhat
+    node_modules/@nomicfoundation/hardhat-ignition
+    @nomicfoundation/hardhat-ignition-ethers  >=3.0.0-next.0
+    Depends on vulnerable versions of @nomicfoundation/hardhat-ignition
+    Depends on vulnerable versions of @nomicfoundation/hardhat-verify
+    Depends on vulnerable versions of hardhat
+    node_modules/@nomicfoundation/hardhat-ignition-ethers
+    @nomicfoundation/hardhat-network-helpers  >=3.0.0-next.0
+    Depends on vulnerable versions of hardhat
+    node_modules/@nomicfoundation/hardhat-network-helpers
+    @nomicfoundation/hardhat-toolbox-mocha-ethers  *
+    Depends on vulnerable versions of @nomicfoundation/hardhat-ethers-chai-matchers
+    Depends on vulnerable versions of @nomicfoundation/hardhat-ignition
+    Depends on vulnerable versions of @nomicfoundation/hardhat-ignition-ethers
+    Depends on vulnerable versions of @nomicfoundation/hardhat-keystore
+    Depends on vulnerable versions of @nomicfoundation/hardhat-mocha
+    Depends on vulnerable versions of @nomicfoundation/hardhat-network-helpers
+    Depends on vulnerable versions of @nomicfoundation/hardhat-typechain
+    Depends on vulnerable versions of @nomicfoundation/hardhat-verify
+    Depends on vulnerable versions of hardhat
+    node_modules/@nomicfoundation/hardhat-toolbox-mocha-ethers
+
+13 high severity vulnerabilities
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues possible (including breaking changes), run:
+  npm audit fix --force
+
+Some issues need review, and may require choosing
+a different dependency.

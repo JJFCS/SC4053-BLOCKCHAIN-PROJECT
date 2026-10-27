@@ -1,0 +1,26 @@
+{
+  "name": "verify-after-smoke",
+  "cwd": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts",
+  "command": [
+    "npx",
+    "--no-install",
+    "hardhat",
+    "run",
+    "scripts/verify-deployment.ts",
+    "--network",
+    "localhost"
+  ],
+  "startedAt": "2026-10-27T05:42:00.336070+00:00",
+  "endedAt": "2026-10-27T05:42:01.572149+00:00",
+  "exitCode": 0
+}
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+{
+  "verified": true,
+  "chainId": "31337",
+  "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "treasury": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+  "currentRoundId": "2"
+}
