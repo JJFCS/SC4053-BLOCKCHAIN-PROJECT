@@ -2,7 +2,9 @@
 
 Date: 27 October 2026, Singapore time.
 Execution: isolated automated Linux workspace, Node 24.22.1, npm 11.9.0.
-These are executed results, not claims about a teammate's Windows installation.
+The automated test results below came from that workspace. The public Sepolia
+deployment and verification were subsequently run on Windows;
+their outputs were supplied separately on 27 October.
 
 ## Inputs and preservation
 
@@ -33,6 +35,8 @@ These are executed results, not claims about a teammate's Windows installation.
 | ABI export | 48 entries, regenerated from the current compiler artifact. |
 | HTTP localhost deployment | Passed on chain 31337, nonzero constructor treasury, no auction automatically started. |
 | Deployment verification | Passed before and after the transaction scenario. |
+| Public Sepolia deployment | Windows command output: chain 11155111; registrar `0x9dbe733cDB4F8BBB6a960177c2c3bB7E005819F9`; treasury/deployer `0x20Dc8080A1e86d2e2E80FbF9E6FAe548073B0c6F`; transaction `0xb07b99bb1b8e63c1610ab77b9103f1665045a837eb70cd684ca3157915d55408`. |
+| Public Sepolia verification | Separate `verify-deployment.ts` command reported `verified: true`, chain 11155111, same address, and `currentRoundId: 0`. |
 | Local transaction scenario | Passed: competing bids, late reveal ordering, older finalization during a newer round, all three refund outcomes, withdrawals, address update and checked payment. |
 | Invalid deployment configuration | Zero treasury and ephemeral deployment requests were rejected before a deployment transaction. |
 | Frontend locked install | Passed. |
@@ -75,17 +79,23 @@ Raw before/update/after outputs are retained as evidence.
 - `docs/evidence/local-smoke-*.json`: actual local transaction records.
 - `docs/evidence/recorded-run/`: original suite, frontend build failure, dependency
   review, deployment and verification output captured during this work.
+- `contracts/deployments/11155111.json` on the Windows checkout:
+  public Sepolia deployment record written by the deployment script. Include
+  that record in the final repository evidence; it was not part of the earlier
+  captured Linux logs.
 
 The local node used for captured evidence was stopped after testing. Its hashes
 are local evidence, not public explorer links or an address hosted for teammates.
-Create the matching deployment in the environment used for browser acceptance
-and record/share that actual address, chain and ABI. No Sepolia, Slither, formal verification,
-Windows rerun, or real MetaMask/React flow is claimed by this record.
+The Sepolia deployment above supplies a shared address for the current browser
+integration. No Slither, formal verification, complete Windows suite rerun, or
+real MetaMask/React flow is claimed by this record. The public explorer page was
+not independently loaded in this review; the separate network verification
+command reported success.
 
 ## Remaining integration work
 
 1. Complete the remaining recovery, recipient-confirmation and network checks against the current frontend.
 2. Run the browser checklist against that version and record real results.
-3. A/B provide their actual tooling and representative prompt records for the report.
+3. State the limits of the available team tooling and development history in the report.
 4. The group addresses or explicitly evaluates the remaining dependency finding,
    then completes the audit report, fresh installation check and demo video.

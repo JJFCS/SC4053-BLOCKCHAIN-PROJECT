@@ -7,7 +7,7 @@ The ABI below comes directly from the Solidity 0.8.34 compiler artifact.
 
 ## Start here
 
-- Frontend integration: use contracts/abi/DomainRegistrar.json, connect it to the address and chain supplied by Person C, and use the canonical round-based operations below.
+- Frontend integration: use contracts/abi/DomainRegistrar.json with the deployed address and chain ID, and use the canonical round-based operations below.
 - Deployment: deploy DomainRegistrar with one nonzero treasuryAddress constructor argument. Publish the real address, chain ID, deployment transaction, constructor argument, source revision, and matching ABI to the team.
 - Contract maintenance: support integration questions and address observed contract failures against this interface.
 

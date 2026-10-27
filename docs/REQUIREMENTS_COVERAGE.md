@@ -34,7 +34,7 @@ Source versions and every captured branch head are recorded in SOURCE_REVISIONS.
 | R26 | Zero payment, unknown name, or reserved name | DomainRegistrarPayments.t.sol | Contract checks passed; browser flow pending |
 | R27 | Successful payment alongside locked auction funds | DomainRegistrarPayments.ts; local smoke | Contract checks passed |
 | R28 | Different settlement and withdrawal orders | DomainRegistrarAccounting.t.sol | Contract checks passed |
-| R29 | Fresh installation and deployment | Fresh contract install/validation and local deployment; frontend build repair | Contract/deployment verified; complete browser setup pending |
+| R29 | Fresh installation and deployment | Fresh contract install/validation and local deployment; Sepolia deployment and separate verification; frontend build repair | Contract/deployment verified; complete browser setup pending |
 
 ## Course deliverables
 
@@ -43,7 +43,7 @@ Source versions and every captured branch head are recorded in SOURCE_REVISIONS.
 | Domain registrar, commit/reveal, ownership and forward resolution | Contract implemented and tested; integrated browser acceptance pending. |
 | Search, bid/reveal UI and ETH payments by name | Current frontend implements the main screens; latest handler checks verified; remaining findings recorded. |
 | Short test phases and non-reveal policy | 120/120 seconds and 0.001 ETH penalty implemented and exercised. |
-| Specification/tooling and representative prompt records | Included; actual A/B tool/prompt history still needed for the final group account. |
+| Specification and validation tooling | Specification and validation workflow documented; available AI workflow evidence is described in the audit report. |
 | Eight-section AI Audit Report and major-issue evidence | Working report/evidence included; unresolved items remain visible. |
 | Complete reproducible code ZIP and README | Integration changes supplied; final fresh browser setup and submission packaging pending. |
 | Demo video at most 10 minutes, architecture and deployed demonstration | Not recorded in this workflow. |

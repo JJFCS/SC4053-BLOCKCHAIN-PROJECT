@@ -37,7 +37,7 @@ integration, and C for independent validation, deployment and audit coordination
 Actual contributions should be described in the final group report; this split
 is a team workflow rather than a separately assigned course rubric.
 
-C used ChatGPT/Codex to inspect the uploaded code, follow the repository's
+The independent validation used ChatGPT/Codex to inspect the supplied code, follow the repository's
 Hardhat skills, prepare scripts/tests/docs, execute validation in an isolated
 Linux environment, and interpret the output. The original archives were retained.
 New work was prepared in a separate copy and exported as a reviewable patch.
@@ -54,9 +54,8 @@ Infrastructure consists of:
 - An archived-handler audit harness which connects the unchanged historical
   frontend module to a real simulated EVM through an EIP-1193 bridge.
 
-A/B's exact generation tools/models and prompt chains have not been supplied in
-the current handoff. Repository instruction files are not proof that a specific
-assistant was used. Their actual records must be incorporated before submission.
+A/B's exact generation tools/models and prompt chains were not included in the
+handoff. Repository instruction files do not establish which assistant anyone used.
 
 ## 3. Specification Engineering & Prompt Logs
 
@@ -64,11 +63,10 @@ The formal specification defines contract state transitions, deadline boundaries
 accounting, canonical function inputs, browser recovery and acceptance criteria.
 This gives code generation and subsequent review a shared set of observable rules.
 
-Representative conversation topics and the actual work authorization are in
-`PROMPT_RECORDS.md`. Summary entries are labelled as summaries, not fabricated
-verbatim prompts. The supplied context included the project brief, completed
-v0.5 specification, main/frontend archives, package/config files, existing tests,
-and A's interface and validation handoff.
+The supplied context for the independent validation included the project brief,
+the v0.5 specification, repository snapshots, package/config files, existing
+tests, and the contract interface handoff. Original A/B prompt records are
+unavailable in the reviewed materials.
 
 Review proceeded in iterations: establish source revisions, run original checks,
 incorporate the handoff, add deployment/integration tools, reproduce frontend
@@ -102,7 +100,7 @@ verification are in `FRONTEND_FINDINGS.md`.
 | ID | Finding | Evidence/status |
 | --- | --- | --- |
 | DOC-01 | Main's specification was a heading; ABI/interface handoff absent. | Resolved in working copy by incorporating A's handoff; ABI equality checked. |
-| DEPLOY-01 | Only the Counter example was deployable through the supplied module. | Registrar deployment/verification added and exercised over local HTTP RPC. |
+| DEPLOY-01 | Only the Counter example was deployable through the supplied module. | Registrar deployment/verification added, exercised over local HTTP RPC, then deployed and verified on Sepolia. |
 | FE-01 | Current build fails on unused icon/orphan component imports. | Repaired and production build verified; before/after logs retained. |
 | FE-02 | Historical short-name mismatch. | Fixed in 16decbd; current handler check passed. |
 | FE-03 | Historical round-0 read failure. | Fixed in 16decbd; current handler check passed. |
@@ -127,7 +125,7 @@ dependency finding and is not presented as a demonstrated on-chain funds exploit
 
 ## 6. Validation Process & Testing Strategy
 
-Validation was executed in the assistant's Linux workspace with Node 24.22.1 and
+Validation was executed in an isolated Linux environment with Node 24.22.1 and
 npm 11.9.0. The repository specifies Node 26. An earlier Windows run showed
 38 tests on an earlier state; those results are not substituted for current tests.
 
@@ -148,6 +146,20 @@ started, winning/losing/non-reveal settlement, all withdrawals, address updates,
 stale-recipient rejection and successful checked payment while preserving a
 newer deposit. Actual local hashes and output are in `docs/evidence`.
 
+On 27 October 2026 at 09:56 UTC, `DomainRegistrar` was deployed from a Windows
+checkout to Ethereum Sepolia (chain ID `11155111`). The contract source matches
+the reviewed main revision `cb1f3c4`. The deployed contract
+is `0x9dbe733cDB4F8BBB6a960177c2c3bB7E005819F9`, with public treasury and
+deployer address `0x20Dc8080A1e86d2e2E80FbF9E6FAe548073B0c6F`. The
+deployment transaction is
+`0xb07b99bb1b8e63c1610ab77b9103f1665045a837eb70cd684ca3157915d55408`.
+The deployment script reported successful verification, and the separate
+`verify-deployment.ts` run reported `verified: true` and `currentRoundId: 0`.
+These are the Windows command outputs supplied by the team; the public deployment
+record was written locally to `contracts/deployments/11155111.json` and should be
+included with the final project evidence. Browser acceptance has not followed
+from this deployment alone.
+
 The historical frontend build failed. Five behavioural issues were reproduced by
 executing its real handler module against the EVM. This is not React/MetaMask
 acceptance: browser storage, user confirmation, live wallet changes and reload
@@ -164,7 +176,8 @@ specification criteria is recorded in REQUIREMENTS_COVERAGE.md.
 
 Dependency changes were followed by the complete validation suite, frontend
 reproductions and local deployment scenario. Current audit outputs distinguish
-before/update/after states. No Slither run, public testnet deployment or formal
+before/update/after states. Sepolia deployment and script verification are now
+recorded separately from the Linux test runs. No Slither run or formal
 verification is claimed. `VALIDATION.md` identifies the evidence and boundaries.
 
 ## 7. Improvements & Refinements
@@ -180,7 +193,6 @@ verification is claimed. `VALIDATION.md` identifies the evidence and boundaries.
   frontend findings with source/version evidence.
 - Updated compatible dependency versions without forcing a Hardhat major downgrade,
   then reran tests. The remaining advisory is explicitly recorded.
-- Replaced the title-only README with setup, deployment and integration instructions.
 
 No Solidity logic change was made in this pass. The production build repair removes an unused icon and unreferenced component.
 The existing frontend commit fixes several older findings, verified separately
@@ -206,6 +218,7 @@ suggestions still needed context, reproducible checks and clear ownership of
 integration work. Dependency reports also required interpretation: compatible
 updates removed some findings, while a forced fix proposed breaking changes.
 
-Before submission, incorporate B's fixes and browser results, A/B's actual tool
-and prompt history, the team's actual deployment records, and the final fresh
-setup and demo evidence. Keep unresolved limitations visible in the submitted report.
+Before submission, incorporate B's fixes and browser results, public Sepolia
+deployment evidence, and final fresh setup and demo evidence. Identify any
+development history that remains unavailable and keep unresolved limitations
+visible in the submitted report.
