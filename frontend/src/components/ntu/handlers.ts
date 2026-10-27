@@ -4,9 +4,16 @@ import {
   Contract,
   ZeroAddress,
   formatEther,
+  isAddress,
   keccak256,
   parseEther,
 } from "ethers"
+
+/*
+  ============================================================
+  METAMASK
+  ============================================================
+*/
 
 declare global {
   interface Window {
@@ -14,54 +21,105 @@ declare global {
   }
 }
 
+/*
+  ============================================================
+  CONTRACT CONFIGURATION
+  ============================================================
+*/
+
 const REGISTRAR_ADDRESS =
-  import.meta.env.VITE_REGISTRAR_ADDRESS as string | undefined
+  import.meta.env.VITE_REGISTRAR_ADDRESS as
+    | string
+    | undefined
+
+/*
+  ABI matching the final DomainRegistrar.sol.
+
+  We include only the functions/events used by the frontend.
+*/
 
 const REGISTRAR_ABI = [
+  /*
+    ROUND MANAGEMENT
+  */
   "function startRound() returns (uint256 roundId)",
+
   "function getCurrentRound() view returns (uint256)",
+
   "function getRound(uint256 roundId) view returns (tuple(uint256 startTime, uint256 commitEnd, uint256 revealEnd, uint8 phase, uint256 pendingDomainCount, uint256 deposit, uint256 nonRevealPenalty, address treasury))",
 
+  /*
+    CONFIGURATION
+  */
   "function COMMIT_DEPOSIT() view returns (uint256)",
+
   "function NON_REVEAL_PENALTY() view returns (uint256)",
 
-  "function computeCommitment(uint256 roundId, address bidder, string label, uint256 bidWei, bytes32 salt) view returns (bytes32)",
-
-  "function commit(uint256 roundId, bytes32 digest) payable returns (uint256 commitmentId)",
+  /*
+    COMMIT
+  */
   "function commitBid(uint256 roundId, bytes32 digest) payable",
 
-  "function reveal(uint256 commitmentId, string label, uint256 bidWei, bytes32 salt) returns (bool valid)",
+  /*
+    REVEAL
+  */
   "function revealBid(uint256 roundId, string label, uint256 bidWei, bytes32 salt)",
 
+  /*
+    COMMITMENT LOOKUP
+  */
   "function getCommitment(uint256 commitmentId) view returns (tuple(address bidder, bytes32 digest, uint256 roundId, uint256 deposit, bool revealed, bool valid, bytes32 labelHash, uint256 bidWei, bool settled))",
 
   "function getCommitmentId(uint256 roundId, address bidder) view returns (uint256)",
 
   "function getCommitmentForRound(uint256 roundId, address bidder) view returns (tuple(address bidder, bytes32 digest, uint256 roundId, uint256 deposit, bool revealed, bool valid, bytes32 labelHash, uint256 bidWei, bool settled))",
 
+  /*
+    AUCTION
+  */
   "function getAuction(string label) view returns (tuple(uint256 roundId, uint256 winningCommitmentId, address highestBidder, uint256 highestBidWei, bool finalized))",
 
   "function getAuctionForRound(uint256 roundId, string label) view returns (tuple(uint256 roundId, uint256 winningCommitmentId, address highestBidder, uint256 highestBidWei, bool finalized))",
 
   "function reservedRound(string label) view returns (uint256)",
 
+  /*
+    DOMAIN
+  */
   "function finalizeName(string label) returns (address owner)",
+
   "function finalizeDomain(uint256 roundId, string label) returns (address owner)",
 
   "function getDomain(string label) view returns (tuple(address owner, uint256 roundId, uint256 winningCommitmentId, uint256 priceWei, address resolutionAddress))",
 
   "function ownerOf(string label) view returns (address)",
+
+  /*
+    RESOLUTION
+  */
   "function resolve(string label) view returns (address)",
+
   "function setAddress(string label, address target)",
 
+  /*
+    SETTLEMENT
+  */
   "function settleBid(uint256 roundId)",
+
   "function settleCommit(uint256 commitmentId) returns (uint256 refundWei, uint256 proceedsWei)",
 
   "function withdrawalCredits(address account) view returns (uint256)",
+
   "function withdraw()",
 
+  /*
+    PAYMENT
+  */
   "function sendToDomain(string label, address expectedRecipient) payable",
 
+  /*
+    EVENTS
+  */
   "event RoundStarted(uint256 indexed roundId, address indexed starter, uint256 startTime, uint256 commitEnd, uint256 revealEnd)",
 
   "event CommitmentSubmitted(uint256 indexed commitmentId, uint256 indexed roundId, address indexed bidder, bytes32 digest)",
@@ -79,6 +137,12 @@ const REGISTRAR_ABI = [
   "event DomainPayment(bytes32 indexed labelHash, address indexed sender, address indexed recipient, string label, uint256 amountWei)",
 ]
 
+/*
+  ============================================================
+  TYPES
+  ============================================================
+*/
+
 export type DomainStatus =
   | "available"
   | "commit"
@@ -94,64 +158,269 @@ export type RoundPhase =
 
 export interface DomainInfo {
   name: string
+
   status: DomainStatus
+
   roundId?: string
+
   phaseEndsAt?: number
+
   owner?: string
+
   resolutionAddress?: string
+
   highestBid?: string
+
   highestBidder?: string
+
   winningCommitmentId?: string
+
   priceWei?: string
+
   finalized?: boolean
+
   reservedRoundId?: string
 }
 
 export interface Commitment {
+  /*
+    On-chain commitment sequence ID.
+
+    Optional because imported/legacy records may not
+    initially contain it.
+  */
   commitmentId?: string
+
+  /*
+    uint256 values are stored as decimal strings.
+  */
   roundId: string
+
   bidder: string
+
+  /*
+    Canonical label WITHOUT .ntu.
+  */
   name: string
+
+  /*
+    Human-readable amount for the UI.
+    Example: "0.030000000000000001"
+  */
   amount: string
+
+  /*
+    Exact amount used in commitment/reveal.
+
+    Example:
+    "30000000000000001"
+
+    Never store this as a JS number.
+  */
+  bidWei: string
+
   salt: string
+
   hash: string
+
   txHash: string
+
   createdAt: number
+
   revealed: boolean
+
   valid?: boolean
+
   settled?: boolean
 }
 
 export interface RoundState {
   roundId: string
+
   startTime: number
+
   commitEnd: number
+
   revealEnd: number
+
   phase: RoundPhase
+
   phaseEndsAt?: number
+
   pendingDomainCount: string
+
   deposit: string
+
   nonRevealPenalty: string
+
   treasury: string
 }
 
-export function generateSalt(): string {
-  const bytes = crypto.getRandomValues(
-    new Uint8Array(32)
+/*
+  ============================================================
+  LABEL NORMALISATION
+  ============================================================
+*/
+
+export function normalizeLabel(
+  value: string
+): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(
+      /\.ntu$/,
+      ""
+    )
+}
+
+/*
+  Used by input fields while typing.
+
+  Invalid characters are removed for convenience.
+*/
+
+export function sanitizeLabel(
+  value: string
+): string {
+  return normalizeLabel(
+    value
   )
+    .replace(
+      /[^a-z0-9-]/g,
+      ""
+    )
+    .slice(
+      0,
+      32
+    )
+}
+
+/*
+  ============================================================
+  LABEL VALIDATION
+  ============================================================
+
+  Final specification / contract:
+
+  - 3–32 ASCII bytes
+  - lowercase a-z
+  - digits 0-9
+  - hyphens allowed
+  - cannot begin with "-"
+  - cannot end with "-"
+*/
+
+export function validateLabel(
+  value: string
+): {
+  valid: boolean
+  error?: string
+} {
+  const label =
+    normalizeLabel(
+      value
+    )
+
+  const byteLength =
+    new TextEncoder()
+      .encode(
+        label
+      )
+      .length
+
+  if (
+    byteLength < 3
+  ) {
+    return {
+      valid: false,
+
+      error:
+        "Domain names must be at least 3 characters long.",
+    }
+  }
+
+  if (
+    byteLength > 32
+  ) {
+    return {
+      valid: false,
+
+      error:
+        "Domain names cannot exceed 32 characters.",
+    }
+  }
+
+  if (
+    label.startsWith("-") ||
+    label.endsWith("-")
+  ) {
+    return {
+      valid: false,
+
+      error:
+        "Domain names cannot start or end with a hyphen.",
+    }
+  }
+
+  if (
+    !/^[a-z0-9-]+$/.test(
+      label
+    )
+  ) {
+    return {
+      valid: false,
+
+      error:
+        "Use lowercase letters, numbers and hyphens only.",
+    }
+  }
+
+  return {
+    valid: true,
+  }
+}
+
+/*
+  ============================================================
+  SALT
+  ============================================================
+*/
+
+export function generateSalt(): string {
+  const bytes =
+    crypto.getRandomValues(
+      new Uint8Array(32)
+    )
 
   return (
     "0x" +
-    Array.from(bytes)
-      .map((byte) =>
-        byte.toString(16).padStart(2, "0")
+    Array.from(
+      bytes
+    )
+      .map(
+        (byte) =>
+          byte
+            .toString(16)
+            .padStart(
+              2,
+              "0"
+            )
       )
       .join("")
   )
 }
 
+/*
+  ============================================================
+  BASIC REQUIREMENTS
+  ============================================================
+*/
+
 function requireMetaMask() {
-  if (!window.ethereum) {
+  if (
+    !window.ethereum
+  ) {
     throw new Error(
       "MetaMask is not installed. Please install MetaMask first."
     )
@@ -160,8 +429,10 @@ function requireMetaMask() {
   return window.ethereum
 }
 
-function requireContractAddress(): string {
-  if (!REGISTRAR_ADDRESS) {
+export function getRegistrarAddress(): string {
+  if (
+    !REGISTRAR_ADDRESS
+  ) {
     throw new Error(
       "Registrar contract has not been deployed/configured yet."
     )
@@ -169,6 +440,12 @@ function requireContractAddress(): string {
 
   return REGISTRAR_ADDRESS
 }
+
+/*
+  ============================================================
+  ERROR MESSAGES
+  ============================================================
+*/
 
 export function getFriendlyError(
   error: unknown
@@ -178,7 +455,11 @@ export function getFriendlyError(
       ? error.message
       : String(error)
 
-  const messages: Record<string, string> = {
+  const messages:
+    Record<
+      string,
+      string
+    > = {
     "WRONG ROUND":
       "This auction round is no longer the current round.",
 
@@ -216,16 +497,16 @@ export function getFriendlyError(
       "This .ntu name is invalid.",
 
     "INVALID BID":
-      "The revealed bid is invalid.",
+      "The revealed bid is outside the allowed range.",
 
     "ALREADY REGISTERED":
       "This .ntu name has already been registered.",
 
     "NAME RESERVED":
-      "This .ntu name is already reserved by another auction round.",
+      "This .ntu name is reserved by another auction round.",
 
     "COMMITMENT MISMATCH":
-      "The bid, name or salt does not match the original commitment.",
+      "The name, bid, salt or context does not match the original commitment.",
 
     "NO WINNING BID":
       "There is no winning bid for this name.",
@@ -237,7 +518,7 @@ export function getFriendlyError(
       "This name belongs to a different auction round.",
 
     "DOMAIN NOT FINALIZED":
-      "The domain must be finalized before this commitment can be settled.",
+      "This domain must be finalized before this revealed bid can be settled.",
 
     "ALREADY SETTLED":
       "This commitment has already been settled.",
@@ -261,14 +542,25 @@ export function getFriendlyError(
       "Payment amount must be greater than zero.",
 
     "RECIPIENT CHANGED":
-      "The domain resolution address changed before the payment was confirmed. Please try again.",
+      "The domain's resolution address changed before the payment was confirmed. Please review the new recipient before trying again.",
 
     "ETH TRANSFER FAILED":
       "The ETH transfer failed.",
   }
 
-  for (const [code, friendly] of Object.entries(messages)) {
-    if (raw.includes(code)) {
+  for (
+    const [
+      code,
+      friendly,
+    ] of Object.entries(
+      messages
+    )
+  ) {
+    if (
+      raw.includes(
+        code
+      )
+    ) {
       return friendly
     }
   }
@@ -277,8 +569,12 @@ export function getFriendlyError(
     raw.toLowerCase()
 
   if (
-    lower.includes("user rejected") ||
-    lower.includes("user denied")
+    lower.includes(
+      "user rejected"
+    ) ||
+    lower.includes(
+      "user denied"
+    )
   ) {
     return "The MetaMask transaction was cancelled."
   }
@@ -286,7 +582,13 @@ export function getFriendlyError(
   return raw
 }
 
-function getProvider() {
+/*
+  ============================================================
+  PROVIDER / CONTRACT
+  ============================================================
+*/
+
+export function getProvider() {
   return new BrowserProvider(
     requireMetaMask()
   )
@@ -297,7 +599,7 @@ async function getReadContract() {
     getProvider()
 
   return new Contract(
-    requireContractAddress(),
+    getRegistrarAddress(),
     REGISTRAR_ABI,
     provider
   )
@@ -311,13 +613,20 @@ async function getWriteContract() {
     await provider.getSigner()
 
   return new Contract(
-    requireContractAddress(),
+    getRegistrarAddress(),
     REGISTRAR_ABI,
     signer
   )
 }
 
-export async function connectWallet(): Promise<string> {
+/*
+  ============================================================
+  WALLET
+  ============================================================
+*/
+
+export async function connectWallet():
+Promise<string> {
   const provider =
     getProvider()
 
@@ -332,14 +641,30 @@ export async function connectWallet(): Promise<string> {
   return await signer.getAddress()
 }
 
-export async function disconnectWallet(): Promise<void> {
+export async function disconnectWallet():
+Promise<void> {
+  /*
+    MetaMask does not expose a normal
+    programmatic disconnect method.
+
+    NtuApp clears its own React state.
+  */
+
   return
 }
+
+/*
+  ============================================================
+  ROUND HELPERS
+  ============================================================
+*/
 
 function phaseFromNumber(
   phase: number
 ): RoundPhase {
-  switch (phase) {
+  switch (
+    phase
+  ) {
     case 1:
       return "commit"
 
@@ -354,26 +679,35 @@ function phaseFromNumber(
   }
 }
 
-export async function getCurrentRound(): Promise<string> {
+export async function getCurrentRound():
+Promise<string> {
   const contract =
     await getReadContract()
 
-  const roundId: bigint =
+  const roundId:
+    bigint =
     await contract.getCurrentRound()
 
   return roundId.toString()
 }
 
-export async function getCurrentRoundState(): Promise<
-  RoundState | null
-> {
+export async function getCurrentRoundState():
+Promise<RoundState | null> {
   const contract =
     await getReadContract()
 
-  const roundId: bigint =
+  const roundId:
+    bigint =
     await contract.getCurrentRound()
 
-  if (roundId === 0n) {
+  /*
+    No round has been started yet.
+  */
+
+  if (
+    roundId ===
+    0n
+  ) {
     return null
   }
 
@@ -384,22 +718,32 @@ export async function getCurrentRoundState(): Promise<
 
   const phase =
     phaseFromNumber(
-      Number(round.phase)
+      Number(
+        round.phase
+      )
     )
 
   let phaseEndsAt:
     number | undefined
 
-  if (phase === "commit") {
+  if (
+    phase ===
+    "commit"
+  ) {
     phaseEndsAt =
-      Number(round.commitEnd) *
-      1000
+      Number(
+        round.commitEnd
+      ) * 1000
   }
 
-  if (phase === "reveal") {
+  if (
+    phase ===
+    "reveal"
+  ) {
     phaseEndsAt =
-      Number(round.revealEnd) *
-      1000
+      Number(
+        round.revealEnd
+      ) * 1000
   }
 
   return {
@@ -407,16 +751,19 @@ export async function getCurrentRoundState(): Promise<
       roundId.toString(),
 
     startTime:
-      Number(round.startTime) *
-      1000,
+      Number(
+        round.startTime
+      ) * 1000,
 
     commitEnd:
-      Number(round.commitEnd) *
-      1000,
+      Number(
+        round.commitEnd
+      ) * 1000,
 
     revealEnd:
-      Number(round.revealEnd) *
-      1000,
+      Number(
+        round.revealEnd
+      ) * 1000,
 
     phase,
 
@@ -440,7 +787,14 @@ export async function getCurrentRoundState(): Promise<
   }
 }
 
-export async function startAuctionRound(): Promise<{
+/*
+  ============================================================
+  START ROUND
+  ============================================================
+*/
+
+export async function startAuctionRound():
+Promise<{
   roundId: string
   txHash: string
 }> {
@@ -456,8 +810,13 @@ export async function startAuctionRound(): Promise<{
   let roundId:
     string | undefined
 
-  if (receipt) {
-    for (const log of receipt.logs) {
+  if (
+    receipt
+  ) {
+    for (
+      const log of
+      receipt.logs
+    ) {
       try {
         const parsed =
           contract.interface.parseLog(
@@ -469,17 +828,23 @@ export async function startAuctionRound(): Promise<{
           "RoundStarted"
         ) {
           roundId =
-            parsed.args.roundId.toString()
+            parsed.args
+              .roundId
+              .toString()
 
           break
         }
       } catch {
-        // Ignore unrelated logs.
+        /*
+          Ignore unrelated logs.
+        */
       }
     }
   }
 
-  if (!roundId) {
+  if (
+    !roundId
+  ) {
     throw new Error(
       "Round started, but the round ID could not be recovered."
     )
@@ -487,17 +852,45 @@ export async function startAuctionRound(): Promise<{
 
   return {
     roundId,
+
     txHash:
       tx.hash,
   }
 }
 
+/*
+  ============================================================
+  COMMITMENT HASH
+  ============================================================
+
+  Exact formula required by the specification:
+
+  keccak256(
+    abi.encode(
+      chainId,
+      registrarAddress,
+      roundId,
+      bidder,
+      label,
+      bidWei,
+      salt
+    )
+  )
+
+  IMPORTANT:
+  This is abi.encode, NOT abi.encodePacked.
+*/
+
 export async function computeCommitmentHash(
   params: {
     roundId: bigint
+
     bidder: string
+
     label: string
+
     bidWei: bigint
+
     salt: string
   }
 ): Promise<string> {
@@ -523,11 +916,17 @@ export async function computeCommitmentHash(
       ],
       [
         network.chainId,
-        requireContractAddress(),
+
+        getRegistrarAddress(),
+
         params.roundId,
+
         params.bidder,
+
         params.label,
+
         params.bidWei,
+
         params.salt,
       ]
     )
@@ -537,18 +936,28 @@ export async function computeCommitmentHash(
   )
 }
 
+/*
+  ============================================================
+  DOMAIN SEARCH
+  ============================================================
+*/
+
 export async function checkDomain(
   rawName: string
 ): Promise<DomainInfo> {
   const name =
-    rawName
-      .toLowerCase()
-      .replace(/\.ntu$/, "")
+    normalizeLabel(
+      rawName
+    )
 
   const validation =
-    validateLabel(name)
+    validateLabel(
+      name
+    )
 
-  if (!validation.valid) {
+  if (
+    !validation.valid
+  ) {
     throw new Error(
       validation.error ??
         "Invalid domain name."
@@ -557,6 +966,12 @@ export async function checkDomain(
 
   const contract =
     await getReadContract()
+
+  /*
+    --------------------------------------------------------
+    REGISTERED?
+    --------------------------------------------------------
+  */
 
   const domain =
     await contract.getDomain(
@@ -583,7 +998,9 @@ export async function checkDomain(
         domain.roundId.toString(),
 
       winningCommitmentId:
-        domain.winningCommitmentId.toString(),
+        domain
+          .winningCommitmentId
+          .toString(),
 
       highestBid:
         formatEther(
@@ -597,6 +1014,12 @@ export async function checkDomain(
         true,
     }
   }
+
+  /*
+    --------------------------------------------------------
+    RESERVED?
+    --------------------------------------------------------
+  */
 
   const reservedRoundId:
     bigint =
@@ -621,11 +1044,14 @@ export async function checkDomain(
 
     const phase =
       phaseFromNumber(
-        Number(round.phase)
+        Number(
+          round.phase
+        )
       )
 
     if (
-      phase === "reveal"
+      phase ===
+      "reveal"
     ) {
       return {
         name,
@@ -661,7 +1087,9 @@ export async function checkDomain(
         winningCommitmentId:
           auction.winningCommitmentId >
           0n
-            ? auction.winningCommitmentId.toString()
+            ? auction
+                .winningCommitmentId
+                .toString()
             : undefined,
 
         finalized:
@@ -669,8 +1097,14 @@ export async function checkDomain(
       }
     }
 
+    /*
+      Round has ended but this reservation
+      has not been finalized.
+    */
+
     if (
-      phase === "ended"
+      phase ===
+      "ended"
     ) {
       return {
         name,
@@ -701,7 +1135,9 @@ export async function checkDomain(
         winningCommitmentId:
           auction.winningCommitmentId >
           0n
-            ? auction.winningCommitmentId.toString()
+            ? auction
+                .winningCommitmentId
+                .toString()
             : undefined,
 
         finalized:
@@ -709,6 +1145,12 @@ export async function checkDomain(
       }
     }
   }
+
+  /*
+    --------------------------------------------------------
+    LATEST ROUND
+    --------------------------------------------------------
+  */
 
   const currentRound:
     bigint =
@@ -720,6 +1162,7 @@ export async function checkDomain(
   ) {
     return {
       name,
+
       status:
         "available",
     }
@@ -732,11 +1175,14 @@ export async function checkDomain(
 
   const phase =
     phaseFromNumber(
-      Number(round.phase)
+      Number(
+        round.phase
+      )
     )
 
   if (
-    phase === "commit"
+    phase ===
+    "commit"
   ) {
     return {
       name,
@@ -755,7 +1201,8 @@ export async function checkDomain(
   }
 
   if (
-    phase === "reveal"
+    phase ===
+    "reveal"
   ) {
     return {
       name,
@@ -784,22 +1231,42 @@ export async function checkDomain(
   }
 }
 
+/*
+  ============================================================
+  COMMIT BID
+  ============================================================
+
+  Important:
+
+  We compute the commitment LOCALLY.
+
+  We do NOT call computeCommitment() on-chain during commit,
+  because that would expose the secret inputs in the
+  transaction calldata.
+*/
+
 export async function commitBid(
   params: {
     name: string
+
     amount: string
+
     salt: string
   }
 ): Promise<Commitment> {
   const name =
-    params.name
-      .toLowerCase()
-      .replace(/\.ntu$/, "")
+    normalizeLabel(
+      params.name
+    )
 
   const validation =
-    validateLabel(name)
+    validateLabel(
+      name
+    )
 
-  if (!validation.valid) {
+  if (
+    !validation.valid
+  ) {
     throw new Error(
       validation.error ??
         "Invalid domain name."
@@ -817,6 +1284,10 @@ export async function commitBid(
 
   const contract =
     await getWriteContract()
+
+  /*
+    Current round
+  */
 
   const roundId:
     bigint =
@@ -846,10 +1317,23 @@ export async function commitBid(
     )
   }
 
-  const bidWei =
-    parseEther(
-      params.amount
+  /*
+    Parse once into exact integer wei.
+  */
+
+  let bidWei:
+    bigint
+
+  try {
+    bidWei =
+      parseEther(
+        params.amount
+      )
+  } catch {
+    throw new Error(
+      "Enter a valid ETH bid with no more than 18 decimal places."
     )
+  }
 
   if (
     bidWei <=
@@ -859,6 +1343,30 @@ export async function commitBid(
       "Bid must be greater than zero."
     )
   }
+
+  /*
+    The specification currently defines the
+    fixed deposit as the maximum bid.
+  */
+
+  const deposit:
+    bigint =
+    await contract.COMMIT_DEPOSIT()
+
+  if (
+    bidWei >
+    deposit
+  ) {
+    throw new Error(
+      `Bid cannot exceed ${formatEther(
+        deposit
+      )} ETH.`
+    )
+  }
+
+  /*
+    One commitment per wallet per round.
+  */
 
   const existingCommitmentId:
     bigint =
@@ -876,23 +1384,32 @@ export async function commitBid(
     )
   }
 
+  /*
+    Exact locally-computed commitment.
+  */
+
   const digest =
     await computeCommitmentHash({
       roundId,
+
       bidder,
+
       label:
         name,
+
       bidWei,
+
       salt:
         params.salt,
     })
 
-  const deposit:
-    bigint =
-    await contract.COMMIT_DEPOSIT()
+  /*
+    Frontend-facing contract function from
+    the specification.
+  */
 
   const tx =
-    await contract.commit(
+    await contract.commitBid(
       roundId,
       digest,
       {
@@ -904,11 +1421,21 @@ export async function commitBid(
   const receipt =
     await tx.wait()
 
+  /*
+    Recover the contract's commitment ID
+    from the emitted event.
+  */
+
   let commitmentId:
     string | undefined
 
-  if (receipt) {
-    for (const log of receipt.logs) {
+  if (
+    receipt
+  ) {
+    for (
+      const log of
+      receipt.logs
+    ) {
       try {
         const parsed =
           contract.interface.parseLog(
@@ -920,17 +1447,49 @@ export async function commitBid(
           "CommitmentSubmitted"
         ) {
           commitmentId =
-            parsed.args.commitmentId.toString()
+            parsed.args
+              .commitmentId
+              .toString()
 
           break
         }
       } catch {
-        // Ignore unrelated logs.
+        /*
+          Ignore unrelated logs.
+        */
       }
     }
   }
 
-  if (!commitmentId) {
+  if (
+    !commitmentId
+  ) {
+    /*
+      Fallback read.
+
+      Since one wallet has exactly one
+      commitment per round, this is safe.
+    */
+
+    const recoveredId:
+      bigint =
+      await contract.getCommitmentId(
+        roundId,
+        bidder
+      )
+
+    if (
+      recoveredId >
+      0n
+    ) {
+      commitmentId =
+        recoveredId.toString()
+    }
+  }
+
+  if (
+    !commitmentId
+  ) {
     throw new Error(
       "Commit succeeded, but the commitment ID could not be recovered."
     )
@@ -946,8 +1505,17 @@ export async function commitBid(
 
     name,
 
+    /*
+      Display copy.
+    */
     amount:
       params.amount,
+
+    /*
+      Exact canonical value.
+    */
+    bidWei:
+      bidWei.toString(),
 
     salt:
       params.salt,
@@ -964,40 +1532,61 @@ export async function commitBid(
     revealed:
       false,
 
+    valid:
+      undefined,
+
     settled:
       false,
   }
 }
 
+/*
+  ============================================================
+  REVEAL BID
+  ============================================================
+
+  Uses the exact stored bidWei from the backup/local record.
+
+  We do NOT convert the human-readable amount again.
+*/
+
 export async function revealBid(
-  commitment: Commitment
+  commitment:
+    Commitment
 ): Promise<{
   txHash: string
+
   valid: boolean
 }> {
-  if (
-    !commitment.commitmentId
-  ) {
-    throw new Error(
-      "This saved commitment does not contain its on-chain commitment ID."
-    )
-  }
-
   const contract =
     await getWriteContract()
 
   const bidWei =
-    parseEther(
-      commitment.amount
+    BigInt(
+      commitment.bidWei
     )
 
-  const tx =
-    await contract.reveal(
-      BigInt(
-        commitment.commitmentId
-      ),
-      commitment.name,
+  /*
+    Final specification frontend API:
+
+    revealBid(
+      roundId,
+      label,
       bidWei,
+      salt
+    )
+  */
+
+  const tx =
+    await contract.revealBid(
+      BigInt(
+        commitment.roundId
+      ),
+
+      commitment.name,
+
+      bidWei,
+
       commitment.salt
     )
 
@@ -1007,8 +1596,13 @@ export async function revealBid(
   let valid =
     false
 
-  if (receipt) {
-    for (const log of receipt.logs) {
+  if (
+    receipt
+  ) {
+    for (
+      const log of
+      receipt.logs
+    ) {
       try {
         const parsed =
           contract.interface.parseLog(
@@ -1027,7 +1621,9 @@ export async function revealBid(
           break
         }
       } catch {
-        // Ignore unrelated logs.
+        /*
+          Ignore unrelated logs.
+        */
       }
     }
   }
@@ -1040,18 +1636,55 @@ export async function revealBid(
   }
 }
 
+/*
+  ============================================================
+  FINALIZE DOMAIN
+  ============================================================
+
+  Anyone may call this.
+
+  Ownership still goes to the actual winning bidder.
+*/
+
 export async function finalizeDomain(
   name: string
 ): Promise<{
   owner: string
+
   txHash: string
 }> {
+  const canonical =
+    normalizeLabel(
+      name
+    )
+
   const contract =
     await getWriteContract()
 
+  const reservedRound:
+    bigint =
+    await contract.reservedRound(
+      canonical
+    )
+
+  if (
+    reservedRound ===
+    0n
+  ) {
+    throw new Error(
+      "There is no pending auction to finalize for this name."
+    )
+  }
+
+  /*
+    Use the specification's explicit round-aware
+    finalization function.
+  */
+
   const tx =
-    await contract.finalizeName(
-      name
+    await contract.finalizeDomain(
+      reservedRound,
+      canonical
     )
 
   const receipt =
@@ -1060,8 +1693,13 @@ export async function finalizeDomain(
   let owner:
     string | undefined
 
-  if (receipt) {
-    for (const log of receipt.logs) {
+  if (
+    receipt
+  ) {
+    for (
+      const log of
+      receipt.logs
+    ) {
       try {
         const parsed =
           contract.interface.parseLog(
@@ -1078,12 +1716,33 @@ export async function finalizeDomain(
           break
         }
       } catch {
-        // Ignore unrelated logs.
+        /*
+          Ignore unrelated logs.
+        */
       }
     }
   }
 
-  if (!owner) {
+  if (
+    !owner
+  ) {
+    const domain =
+      await contract.getDomain(
+        canonical
+      )
+
+    if (
+      domain.owner !==
+      ZeroAddress
+    ) {
+      owner =
+        domain.owner
+    }
+  }
+
+  if (
+    !owner
+  ) {
     throw new Error(
       "Domain finalized, but the new owner could not be recovered."
     )
@@ -1097,30 +1756,41 @@ export async function finalizeDomain(
   }
 }
 
+/*
+  ============================================================
+  SETTLEMENT
+  ============================================================
+*/
+
 export async function settleCommitment(
-  commitment: Commitment
+  commitment:
+    Commitment
 ): Promise<{
   txHash: string
+
   refundWei: string
+
   refundEth: string
+
   proceedsWei: string
+
   proceedsEth: string
 }> {
-  if (
-    !commitment.commitmentId
-  ) {
-    throw new Error(
-      "This commitment does not contain its on-chain commitment ID."
-    )
-  }
-
   const contract =
     await getWriteContract()
 
+  /*
+    Specification-facing API:
+
+    settleBid(roundId)
+
+    The contract looks up msg.sender's commitment.
+  */
+
   const tx =
-    await contract.settleCommit(
+    await contract.settleBid(
       BigInt(
-        commitment.commitmentId
+        commitment.roundId
       )
     )
 
@@ -1133,8 +1803,13 @@ export async function settleCommitment(
   let proceedsWei =
     0n
 
-  if (receipt) {
-    for (const log of receipt.logs) {
+  if (
+    receipt
+  ) {
+    for (
+      const log of
+      receipt.logs
+    ) {
       try {
         const parsed =
           contract.interface.parseLog(
@@ -1154,7 +1829,9 @@ export async function settleCommitment(
           break
         }
       } catch {
-        // Ignore unrelated logs.
+        /*
+          Ignore unrelated logs.
+        */
       }
     }
   }
@@ -1181,10 +1858,17 @@ export async function settleCommitment(
   }
 }
 
+/*
+  ============================================================
+  WITHDRAWAL CREDIT
+  ============================================================
+*/
+
 export async function getWithdrawalCredit(
   account: string
 ): Promise<{
   wei: string
+
   eth: string
 }> {
   const contract =
@@ -1207,9 +1891,12 @@ export async function getWithdrawalCredit(
   }
 }
 
-export async function withdrawCredit(): Promise<{
+export async function withdrawCredit():
+Promise<{
   txHash: string
+
   amountWei: string
+
   amountEth: string
 }> {
   const contract =
@@ -1224,8 +1911,13 @@ export async function withdrawCredit(): Promise<{
   let amount =
     0n
 
-  if (receipt) {
-    for (const log of receipt.logs) {
+  if (
+    receipt
+  ) {
+    for (
+      const log of
+      receipt.logs
+    ) {
       try {
         const parsed =
           contract.interface.parseLog(
@@ -1242,7 +1934,9 @@ export async function withdrawCredit(): Promise<{
           break
         }
       } catch {
-        // Ignore unrelated logs.
+        /*
+          Ignore unrelated logs.
+        */
       }
     }
   }
@@ -1261,18 +1955,28 @@ export async function withdrawCredit(): Promise<{
   }
 }
 
+/*
+  ============================================================
+  RESOLUTION
+  ============================================================
+*/
+
 export async function resolveDomain(
   rawName: string
 ): Promise<string> {
   const name =
-    rawName
-      .toLowerCase()
-      .replace(/\.ntu$/, "")
+    normalizeLabel(
+      rawName
+    )
 
   const validation =
-    validateLabel(name)
+    validateLabel(
+      name
+    )
 
-  if (!validation.valid) {
+  if (
+    !validation.valid
+  ) {
     throw new Error(
       validation.error ??
         "Invalid domain name."
@@ -1293,19 +1997,72 @@ export async function resolveDomain(
     ZeroAddress
   ) {
     throw new Error(
-      `${name}.ntu does not currently resolve to an Ethereum address.`
+      `${name}.ntu is not registered or does not currently resolve to an Ethereum address.`
     )
   }
 
   return address
 }
 
+/*
+  ============================================================
+  UPDATE RESOLUTION ADDRESS
+  ============================================================
+*/
+
 export async function setResolutionAddress(
-  name: string,
+  rawName: string,
   target: string
 ): Promise<{
   txHash: string
 }> {
+  const name =
+    normalizeLabel(
+      rawName
+    )
+
+  const validation =
+    validateLabel(
+      name
+    )
+
+  if (
+    !validation.valid
+  ) {
+    throw new Error(
+      validation.error ??
+        "Invalid domain name."
+    )
+  }
+
+  if (
+    !isAddress(
+      target
+    )
+  ) {
+    throw new Error(
+      "Enter a valid Ethereum address."
+    )
+  }
+
+  if (
+    target.toLowerCase() ===
+    ZeroAddress.toLowerCase()
+  ) {
+    throw new Error(
+      "The zero address cannot be used as a resolution address."
+    )
+  }
+
+  if (
+    target.toLowerCase() ===
+    getRegistrarAddress().toLowerCase()
+  ) {
+    throw new Error(
+      "The registrar contract cannot be used as a resolution address."
+    )
+  }
+
   const contract =
     await getWriteContract()
 
@@ -1323,34 +2080,70 @@ export async function setResolutionAddress(
   }
 }
 
+/*
+  ============================================================
+  SEND ETH TO .NTU
+  ============================================================
+
+  Flow:
+
+      resolve(label)
+             ↓
+      display/remember recipient
+             ↓
+      sendToDomain(
+        label,
+        expectedRecipient,
+        { value }
+      )
+
+  Contract re-checks the resolution address before
+  forwarding payment.
+*/
+
 export async function sendPayment(
   params: {
     name: string
+
     amount: string
   }
 ): Promise<{
   resolvedAddress: string
+
   txHash: string
 }> {
   const name =
-    params.name
-      .toLowerCase()
-      .replace(/\.ntu$/, "")
+    normalizeLabel(
+      params.name
+    )
 
   const validation =
-    validateLabel(name)
+    validateLabel(
+      name
+    )
 
-  if (!validation.valid) {
+  if (
+    !validation.valid
+  ) {
     throw new Error(
       validation.error ??
         "Invalid domain name."
     )
   }
 
-  const amountWei =
-    parseEther(
-      params.amount
+  let amountWei:
+    bigint
+
+  try {
+    amountWei =
+      parseEther(
+        params.amount
+      )
+  } catch {
+    throw new Error(
+      "Enter a valid ETH amount with no more than 18 decimal places."
     )
+  }
 
   if (
     amountWei <=
@@ -1361,6 +2154,10 @@ export async function sendPayment(
     )
   }
 
+  /*
+    Preview recipient.
+  */
+
   const resolvedAddress =
     await resolveDomain(
       name
@@ -1368,6 +2165,14 @@ export async function sendPayment(
 
   const contract =
     await getWriteContract()
+
+  /*
+    Checked payment.
+
+    If the resolution address has changed since
+    resolveDomain(), the contract reverts with
+    RECIPIENT CHANGED.
+  */
 
   const tx =
     await contract.sendToDomain(
@@ -1388,6 +2193,12 @@ export async function sendPayment(
       tx.hash,
   }
 }
+
+/*
+  ============================================================
+  DISPLAY HELPERS
+  ============================================================
+*/
 
 export function shortenHex(
   value: string,
@@ -1411,7 +2222,9 @@ export function shortenHex(
 export function formatTimeLeft(
   timestamp?: number
 ): string {
-  if (!timestamp) {
+  if (
+    !timestamp
+  ) {
     return "—"
   }
 
@@ -1439,99 +2252,11 @@ export function formatTimeLeft(
     60
 
   if (
-    minutes > 0
+    minutes >
+    0
   ) {
     return `${minutes}m ${seconds}s`
   }
 
   return `${seconds}s`
-}
-
-export function sanitizeLabel(
-  value: string
-): string {
-  return value
-    .toLowerCase()
-    .replace(/\.ntu$/, "")
-    .replace(
-      /[^a-z0-9-]/g,
-      ""
-    )
-    .slice(
-      0,
-      32
-    )
-}
-
-export function validateLabel(
-  value: string
-): {
-  valid: boolean
-  error?: string
-} {
-  const label =
-    value
-      .toLowerCase()
-      .replace(/\.ntu$/, "")
-
-  const byteLength =
-    new TextEncoder()
-      .encode(label)
-      .length
-
-  if (
-    byteLength < 3
-  ) {
-    return {
-      valid:
-        false,
-
-      error:
-        "Domain names must be at least 3 characters long.",
-    }
-  }
-
-  if (
-    byteLength > 32
-  ) {
-    return {
-      valid:
-        false,
-
-      error:
-        "Domain names cannot exceed 32 characters.",
-    }
-  }
-
-  if (
-    label.startsWith("-") ||
-    label.endsWith("-")
-  ) {
-    return {
-      valid:
-        false,
-
-      error:
-        "Domain names cannot start or end with a hyphen.",
-    }
-  }
-
-  if (
-    !/^[a-z0-9-]+$/.test(
-      label
-    )
-  ) {
-    return {
-      valid:
-        false,
-
-      error:
-        "Use lowercase letters, numbers and hyphens only.",
-    }
-  }
-
-  return {
-    valid:
-      true,
-  }
 }

@@ -43,6 +43,13 @@ import {
 } from "./PaymentSection"
 
 import {
+  backupToCommitment,
+  createRevealBackup,
+  parseRevealBackup,
+  verifyRevealBackup,
+} from "./backup"
+
+import {
   checkDomain,
   commitBid,
   connectWallet,
@@ -65,72 +72,81 @@ import {
 export default function NtuApp() {
   /*
     ========================================================
-    WALLET STATE
+    WALLET
     ========================================================
   */
 
   const [
     account,
     setAccount,
-  ] = useState<string | null>(
-    null
-  )
+  ] =
+    useState<
+      string | null
+    >(null)
 
   const [
     connecting,
     setConnecting,
-  ] = useState(false)
+  ] =
+    useState(false)
 
   /*
     ========================================================
-    ROUND STATE
+    ROUND
     ========================================================
   */
 
   const [
     round,
     setRound,
-  ] = useState<RoundState | null>(
-    null
-  )
+  ] =
+    useState<
+      RoundState | null
+    >(null)
 
   const [
     loadingRound,
     setLoadingRound,
-  ] = useState(false)
+  ] =
+    useState(false)
 
   const [
     startingRound,
     setStartingRound,
-  ] = useState(false)
+  ] =
+    useState(false)
 
   /*
     ========================================================
-    DOMAIN STATE
+    DOMAIN
     ========================================================
   */
 
   const [
     domain,
     setDomain,
-  ] = useState<DomainInfo | null>(
-    null
-  )
+  ] =
+    useState<
+      DomainInfo | null
+    >(null)
 
   const [
     searching,
     setSearching,
-  ] = useState(false)
+  ] =
+    useState(false)
 
   const [
     committing,
     setCommitting,
-  ] = useState(false)
+  ] =
+    useState(false)
 
   const [
     finalizing,
     setFinalizing,
-  ] = useState(false)
+  ] =
+    useState(false)
 
   /*
     ========================================================
@@ -141,113 +157,152 @@ export default function NtuApp() {
   const [
     commitments,
     setCommitments,
-  ] = useState<Commitment[]>(() => {
-    try {
-      const saved =
-        localStorage.getItem(
-          "ntu-commitments"
+  ] =
+    useState<
+      Commitment[]
+    >(() => {
+      try {
+        const saved =
+          localStorage.getItem(
+            "ntu-commitments"
+          )
+
+        if (!saved) {
+          return []
+        }
+
+        const parsed =
+          JSON.parse(
+            saved
+          )
+
+        if (
+          !Array.isArray(
+            parsed
+          )
+        ) {
+          return []
+        }
+
+        /*
+          Older local records may not contain bidWei.
+
+          We keep them loaded so they are not silently
+          destroyed, but they will need migration before
+          they can be used for a real reveal.
+        */
+
+        return parsed
+      } catch (
+        error
+      ) {
+        console.error(
+          "Failed to load commitments:",
+          error
         )
 
-      return saved
-        ? JSON.parse(saved)
-        : []
-    } catch (error) {
-      console.error(
-        "Failed to load commitments:",
-        error
-      )
-
-      return []
-    }
-  })
+        return []
+      }
+    })
 
   const [
     revealingHash,
     setRevealingHash,
-  ] = useState<string | null>(
-    null
-  )
+  ] =
+    useState<
+      string | null
+    >(null)
 
   /*
     ========================================================
-    SETTLEMENT / WITHDRAWAL STATE
+    SETTLEMENT / WITHDRAWAL
     ========================================================
   */
 
   const [
     settlingHash,
     setSettlingHash,
-  ] = useState<string | null>(
-    null
-  )
+  ] =
+    useState<
+      string | null
+    >(null)
 
   const [
     withdrawalCreditEth,
     setWithdrawalCreditEth,
-  ] = useState("0")
+  ] =
+    useState("0")
 
   const [
     loadingCredit,
     setLoadingCredit,
-  ] = useState(false)
+  ] =
+    useState(false)
 
   const [
     withdrawing,
     setWithdrawing,
-  ] = useState(false)
+  ] =
+    useState(false)
 
   const [
     lastSettlement,
     setLastSettlement,
-  ] = useState<SettlementResult | null>(
-    null
-  )
+  ] =
+    useState<
+      SettlementResult | null
+    >(null)
 
   const [
     lastWithdrawal,
     setLastWithdrawal,
-  ] = useState<WithdrawalResult | null>(
-    null
-  )
+  ] =
+    useState<
+      WithdrawalResult | null
+    >(null)
 
   /*
     ========================================================
-    RESOLUTION ADDRESS STATE
+    RESOLUTION ADDRESS
     ========================================================
   */
 
   const [
     updatingResolution,
     setUpdatingResolution,
-  ] = useState(false)
+  ] =
+    useState(false)
 
   const [
     lastResolutionTxHash,
     setLastResolutionTxHash,
-  ] = useState<string | null>(
-    null
-  )
+  ] =
+    useState<
+      string | null
+    >(null)
 
   /*
     ========================================================
-    PAYMENT STATE
+    PAYMENT
     ========================================================
   */
 
   const [
     sending,
     setSending,
-  ] = useState(false)
+  ] =
+    useState(false)
 
   const [
     lastPayment,
     setLastPayment,
-  ] = useState<{
-    name: string
-    amount: string
-    resolvedAddress: string
-    txHash: string
-  } | null>(null)
+  ] =
+    useState<{
+      name: string
+      amount: string
+      resolvedAddress: string
+      txHash: string
+    } | null>(null)
 
   /*
     ========================================================
@@ -264,24 +319,48 @@ export default function NtuApp() {
     }
 
     const handleAccountsChanged =
-      (accounts: string[]) => {
+      (
+        accounts:
+          string[]
+      ) => {
         if (
-          accounts.length === 0
+          accounts.length ===
+          0
         ) {
-          setAccount(null)
+          setAccount(
+            null
+          )
         } else {
           setAccount(
             accounts[0]
           )
         }
 
+        /*
+          Wallet-specific UI should refresh
+          when the active account changes.
+        */
+
         setLastResolutionTxHash(
+          null
+        )
+
+        setLastSettlement(
+          null
+        )
+
+        setLastWithdrawal(
           null
         )
       }
 
     const handleChainChanged =
       () => {
+        /*
+          Commitment context includes chain ID,
+          so the safest approach is a full reload.
+        */
+
         window.location.reload()
       }
 
@@ -310,7 +389,7 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    SAVE COMMITMENTS TO LOCAL STORAGE
+    SAVE LOCAL COMMITMENT RECORDS
     ========================================================
   */
 
@@ -322,13 +401,17 @@ export default function NtuApp() {
           commitments
         )
       )
-    } catch (error) {
+    } catch (
+      error
+    ) {
       console.error(
         "Failed to save commitments:",
         error
       )
     }
-  }, [commitments])
+  }, [
+    commitments,
+  ])
 
   /*
     ========================================================
@@ -350,7 +433,9 @@ export default function NtuApp() {
           setRound(
             current
           )
-        } catch (error) {
+        } catch (
+          error
+        ) {
           console.error(
             "Failed to load round:",
             error
@@ -365,11 +450,10 @@ export default function NtuApp() {
     )
 
   /*
-    Load the current round when the app loads.
+    Attempt to load round information when the app starts.
 
-    Once the contract is deployed/configured, this will:
-    - return null if no round exists
-    - otherwise show Commit / Reveal / Ended
+    Until VITE_REGISTRAR_ADDRESS is configured,
+    this will simply fail quietly in the console.
   */
 
   useEffect(() => {
@@ -403,17 +487,11 @@ export default function NtuApp() {
           await startAuctionRound()
 
         console.log(
-          "Started auction round:",
+          "Started round:",
           result.roundId
         )
 
         await refreshRound()
-
-        /*
-          If the user already searched a domain,
-          refresh it because it may now be in the
-          new round's commit phase.
-        */
 
         if (domain) {
           const updated =
@@ -425,7 +503,9 @@ export default function NtuApp() {
             updated
           )
         }
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
           "Failed to start round:",
           error
@@ -479,7 +559,9 @@ export default function NtuApp() {
           setWithdrawalCreditEth(
             credit.eth
           )
-        } catch (error) {
+        } catch (
+          error
+        ) {
           console.error(
             "Failed to read withdrawal credit:",
             error
@@ -490,13 +572,10 @@ export default function NtuApp() {
           )
         }
       },
-      [account]
+      [
+        account,
+      ]
     )
-
-  /*
-    Whenever the connected wallet changes,
-    load that wallet's withdrawal credit.
-  */
 
   useEffect(() => {
     if (!account) {
@@ -517,7 +596,7 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    WALLET
+    WALLET CONNECT / DISCONNECT
     ========================================================
   */
 
@@ -534,7 +613,9 @@ export default function NtuApp() {
         setAccount(
           address
         )
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
           "Wallet connection failed:",
           error
@@ -593,7 +674,9 @@ export default function NtuApp() {
           setDomain(
             result
           )
-        } catch (error) {
+        } catch (
+          error
+        ) {
           console.error(
             "Domain search failed:",
             error
@@ -635,23 +718,19 @@ export default function NtuApp() {
           setDomain(
             updated
           )
-        } catch (error) {
+        } catch (
+          error
+        ) {
           console.error(
             "Failed to refresh domain:",
             error
           )
         }
       },
-      [domain]
+      [
+        domain,
+      ]
     )
-
-  /*
-    Called when the domain countdown expires.
-
-    Refresh both:
-    - the searched domain
-    - overall round state
-  */
 
   const handlePhaseExpired =
     useCallback(
@@ -669,8 +748,17 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    COMMIT
+    COMMIT BID
     ========================================================
+
+    handlers.ts now:
+
+    - canonicalises the label
+    - parses amount to exact bidWei
+    - checks maximum deposit
+    - generates commitment locally
+    - calls commitBid()
+    - returns exact bidWei for recovery
   */
 
   const handleCommit =
@@ -700,7 +788,9 @@ export default function NtuApp() {
           )
 
         setCommitments(
-          (previous) => [
+          (
+            previous
+          ) => [
             commitment,
             ...previous,
           ]
@@ -708,7 +798,7 @@ export default function NtuApp() {
 
         const updated =
           await checkDomain(
-            params.name
+            commitment.name
           )
 
         setDomain(
@@ -716,7 +806,9 @@ export default function NtuApp() {
         )
 
         await refreshRound()
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
           "Commit failed:",
           error
@@ -736,8 +828,11 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    REVEAL
+    REVEAL BID
     ========================================================
+
+    revealBid() now uses commitment.bidWei directly
+    instead of converting the display amount again.
   */
 
   const handleReveal =
@@ -764,6 +859,16 @@ export default function NtuApp() {
         return
       }
 
+      if (
+        !commitment.bidWei
+      ) {
+        alert(
+          "This saved commitment does not contain the exact bidWei value required for reveal. Import a valid versioned backup."
+        )
+
+        return
+      }
+
       setRevealingHash(
         commitment.hash
       )
@@ -775,15 +880,21 @@ export default function NtuApp() {
           )
 
         setCommitments(
-          (previous) =>
+          (
+            previous
+          ) =>
             previous.map(
-              (current) =>
+              (
+                current
+              ) =>
                 current.hash ===
                 commitment.hash
                   ? {
                       ...current,
+
                       revealed:
                         true,
+
                       valid:
                         result.valid,
                     }
@@ -801,7 +912,9 @@ export default function NtuApp() {
         )
 
         await refreshRound()
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
           "Reveal failed:",
           error
@@ -856,7 +969,9 @@ export default function NtuApp() {
         )
 
         await refreshRound()
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
           "Finalization failed:",
           error
@@ -919,13 +1034,18 @@ export default function NtuApp() {
           )
 
         setCommitments(
-          (previous) =>
+          (
+            previous
+          ) =>
             previous.map(
-              (current) =>
+              (
+                current
+              ) =>
                 current.hash ===
                 commitment.hash
                   ? {
                       ...current,
+
                       settled:
                         true,
                     }
@@ -956,7 +1076,9 @@ export default function NtuApp() {
         )
 
         await refreshRound()
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
           "Settlement failed:",
           error
@@ -976,7 +1098,7 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    WITHDRAW
+    WITHDRAW CREDIT
     ========================================================
   */
 
@@ -1013,7 +1135,9 @@ export default function NtuApp() {
         await refreshWithdrawalCredit(
           account
         )
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
           "Withdrawal failed:",
           error
@@ -1089,7 +1213,9 @@ export default function NtuApp() {
         setDomain(
           updated
         )
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
           "Resolution update failed:",
           error
@@ -1109,12 +1235,17 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    BACKUP DOWNLOAD
+    VERSIONED BACKUP EXPORT
     ========================================================
+
+    We no longer dump the internal Commitment objects
+    directly to JSON.
+
+    Each record becomes RevealBackupV1.
   */
 
   const handleDownloadBackup =
-    () => {
+    async () => {
       if (
         commitments.length ===
         0
@@ -1126,135 +1257,227 @@ export default function NtuApp() {
         return
       }
 
-      const data =
-        JSON.stringify(
-          commitments,
-          null,
-          2
+      try {
+        const backups =
+          await Promise.all(
+            commitments.map(
+              (
+                commitment
+              ) =>
+                createRevealBackup(
+                  commitment
+                )
+            )
+          )
+
+        const data =
+          JSON.stringify(
+            backups,
+            null,
+            2
+          )
+
+        const blob =
+          new Blob(
+            [
+              data,
+            ],
+            {
+              type:
+                "application/json",
+            }
+          )
+
+        const url =
+          URL.createObjectURL(
+            blob
+          )
+
+        const anchor =
+          document.createElement(
+            "a"
+          )
+
+        anchor.href =
+          url
+
+        anchor.download =
+          "ntu-reveal-backup-v1.json"
+
+        document.body.appendChild(
+          anchor
         )
 
-      const blob =
-        new Blob(
-          [data],
-          {
-            type:
-              "application/json",
-          }
+        anchor.click()
+
+        document.body.removeChild(
+          anchor
         )
 
-      const url =
-        URL.createObjectURL(
-          blob
+        URL.revokeObjectURL(
+          url
+        )
+      } catch (
+        error
+      ) {
+        console.error(
+          "Backup export failed:",
+          error
         )
 
-      const anchor =
-        document.createElement(
-          "a"
+        alert(
+          getFriendlyError(
+            error
+          )
         )
-
-      anchor.href =
-        url
-
-      anchor.download =
-        "ntu-reveal-backup.json"
-
-      document.body.appendChild(
-        anchor
-      )
-
-      anchor.click()
-
-      document.body.removeChild(
-        anchor
-      )
-
-      URL.revokeObjectURL(
-        url
-      )
+      }
     }
 
   /*
     ========================================================
-    BACKUP IMPORT
+    VERSIONED + VERIFIED BACKUP IMPORT
     ========================================================
+
+    Import process:
+
+    1. JSON schema validation
+    2. chain check
+    3. registrar check
+    4. wallet check
+    5. recompute commitment
+    6. verify actual on-chain commitment
+    7. ONLY THEN update local state
+
+    If any record fails, no existing saved data is replaced.
   */
 
   const handleImportBackup =
     async (
       file: File
     ) => {
+      if (!account) {
+        alert(
+          "Connect the wallet that created the commitment before importing a backup."
+        )
+
+        return
+      }
+
       try {
         const text =
           await file.text()
 
-        const imported =
+        const parsed =
           JSON.parse(
             text
           )
 
-        if (
-          !Array.isArray(
-            imported
+        const records =
+          Array.isArray(
+            parsed
           )
+            ? parsed
+            : [
+                parsed,
+              ]
+
+        const verified:
+          Commitment[] = []
+
+        for (
+          const raw of records
         ) {
-          throw new Error(
-            "Invalid backup format."
+          const backup =
+            parseRevealBackup(
+              raw
+            )
+
+          await verifyRevealBackup(
+            backup,
+            account
+          )
+
+          verified.push(
+            backupToCommitment(
+              backup
+            )
           )
         }
 
-        const valid =
-          imported.every(
-            (item) =>
-              typeof item.commitmentId ===
-                "string" &&
-              typeof item.roundId ===
-                "string" &&
-              typeof item.bidder ===
-                "string" &&
-              typeof item.name ===
-                "string" &&
-              typeof item.amount ===
-                "string" &&
-              typeof item.salt ===
-                "string" &&
-              typeof item.hash ===
-                "string" &&
-              typeof item.txHash ===
-                "string" &&
-              typeof item.createdAt ===
-                "number" &&
-              typeof item.revealed ===
-                "boolean"
-          )
-
-        if (!valid) {
-          throw new Error(
-            "Backup file contains invalid or incomplete commitment data."
-          )
-        }
-
-        const normalized:
-          Commitment[] =
-          imported.map(
-            (item) => ({
-              ...item,
-
-              settled:
-                typeof item.settled ===
-                "boolean"
-                  ? item.settled
-                  : false,
-            })
-          )
+        /*
+          Only mutate React state once all records have
+          successfully passed verification.
+        */
 
         setCommitments(
-          normalized
+          (
+            previous
+          ) => {
+            const merged =
+              [
+                ...previous,
+              ]
+
+            for (
+              const incoming of verified
+            ) {
+              const index =
+                merged.findIndex(
+                  (
+                    existing
+                  ) =>
+                    existing.roundId ===
+                      incoming.roundId &&
+                    existing.bidder.toLowerCase() ===
+                      incoming.bidder.toLowerCase()
+                )
+
+              if (
+                index >=
+                0
+              ) {
+                /*
+                  Preserve any newer UI state such as
+                  revealed/settled if already known locally.
+                */
+
+                merged[
+                  index
+                ] = {
+                  ...incoming,
+
+                  revealed:
+                    merged[
+                      index
+                    ].revealed,
+
+                  valid:
+                    merged[
+                      index
+                    ].valid,
+
+                  settled:
+                    merged[
+                      index
+                    ].settled,
+                }
+              } else {
+                merged.unshift(
+                  incoming
+                )
+              }
+            }
+
+            return merged
+          }
         )
 
         alert(
-          "Reveal backup imported successfully."
+          "Reveal backup verified and imported successfully."
         )
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
           "Backup import failed:",
           error
@@ -1301,9 +1524,12 @@ export default function NtuApp() {
 
         setLastPayment({
           ...params,
+
           ...result,
         })
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
           "Payment failed:",
           error

@@ -1,5 +1,4 @@
 import {
-    Clock3,
     Gavel,
     Play,
     RefreshCcw,
