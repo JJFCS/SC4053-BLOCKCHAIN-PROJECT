@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-27T09:56:13.384Z",
+  "network": "sepolia",
+  "chainId": "11155111",
+  "address": "0x9dbe733cDB4F8BBB6a960177c2c3bB7E005819F9",
+  "treasury": "0x20Dc8080A1e86d2e2E80FbF9E6FAe548073B0c6F",
+  "deployer": "0x20Dc8080A1e86d2e2E80FbF9E6FAe548073B0c6F",
+  "transactionHash": "0xb07b99bb1b8e63c1610ab77b9103f1665045a837eb70cd684ca3157915d55408",
+  "blockNumber": 12004365,
+  "sourceBaseRevision": "cb1f3c4b5bbc04326804089d30991dc69c6a2f60",
+  "gitRevision": "a16e9c8ac75138e3e8b03131f872cdb9333b8bbe",
+  "workingTreeDirty": false,
+  "sourceSha256": "eda56c304c579d9c167550521279008830b4528169042442da05a94c9edabf89",
+  "abiSha256": "914bbe560661b99269ab569b1f860266b65b9a28cdb1592ff1070bef71350f2f",
+  "runtimeCodeHash": "0x70da921817ec30650e6799dab390a146e85f304e856eda5b3d9469b6d7aa4797",
+  "creationDataHash": "0x2694ea5cd0d5d7927c62df6502b094fa07ee208568f6f1ac266acf5e7edd6bff",
+  "initialRoundId": "0"
+}
