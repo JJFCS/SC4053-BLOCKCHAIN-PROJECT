@@ -43,7 +43,7 @@ their outputs were supplied separately on 27 October.
 | Current frontend production build | Failed before repair (unused icon plus unresolved orphan component); passed after the two-file build repair. |
 | Historical frontend runtime probes | Five issues reproduced in 7217ac7 only. |
 | Current frontend handler checks | FE-02 through FE-05 fixed/verified; checked payment path verified, with confirmation UI still open. |
-| Browser/storage/wallet acceptance | Not performed. Checklist and source observations are supplied. |
+| Browser/storage/wallet acceptance | Not performed in this automated run; later partial manual results are described below. |
 
 The totals include five Counter example tests; the expanded registrar-specific
 total is 174. Fuzz function case counts in the raw logs are not added to the
@@ -87,15 +87,31 @@ Raw before/update/after outputs are retained as evidence.
 The local node used for captured evidence was stopped after testing. Its hashes
 are local evidence, not public explorer links or an address hosted for teammates.
 The Sepolia deployment above supplies a shared address for the current browser
-integration. No Slither, formal verification, complete Windows suite rerun, or
-real MetaMask/React flow is claimed by this record. The public explorer page was
+integration. No Slither, formal verification, or complete Windows suite rerun is
+claimed by the automated record. The public explorer page was
 not independently loaded in this review; the separate network verification
 command reported success.
+
+## Later manual browser check
+
+On 29–30 October 2026, frontend-wallet `b753e49` and registrar-validation
+`c2f8bcc` were combined on local chain 31337. Manual observations covered an
+unrevealed bid, a revealed and finalized winning bid, settlement and withdrawal
+of both refunds, an owner resolution update, and a 0.01 ETH payment by name.
+The two settled backup records were imported after a local repair, restoring
+their on-chain IDs and original commit times. A local RPC read showed recipient
+10000.01 ETH and registrar 0.061 ETH after the payment. This manual run is
+recorded in `BROWSER_ACCEPTANCE.md`; it does not add screenshots or full
+browser receipts to the earlier automated evidence.
+
+Wrong-chain reads showed `BAD_DATA`, the navbar labeled the local network
+Sepolia, and Refresh appeared to stall at countdown zero until page reload.
+Remaining browser paths are marked pending in the checklist.
 
 ## Remaining integration work
 
 1. Complete the remaining recovery, recipient-confirmation and network checks against the current frontend.
-2. Run the browser checklist against that version and record real results.
+2. Complete the remaining browser checklist cases on the final version.
 3. State the limits of the available team tooling and development history in the report.
 4. The group addresses or explicitly evaluates the remaining dependency finding,
    then completes the audit report, fresh installation check and demo video.

@@ -201,9 +201,11 @@ export function RevealSection({
                   </dt>
 
                   <dd className="text-right font-mono text-zinc-800">
-                    {new Date(
-                      c.createdAt
-                    ).toLocaleTimeString()}
+                    {c.createdAt
+                      ? new Date(
+                          c.createdAt
+                        ).toLocaleTimeString()
+                      : "Time unavailable"}
                   </dd>
                 </dl>
 

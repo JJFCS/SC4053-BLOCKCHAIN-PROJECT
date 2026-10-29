@@ -23,10 +23,10 @@ Source versions and every captured branch head are recorded in SOURCE_REVISIONS.
 | R15 | Earlier settlements and withdrawals after later rounds start | DomainRegistrarAccounting.ts; local smoke | Contract checks passed |
 | R16 | Recipient rejects ETH or attempts reentrancy | DomainRegistrarWithdrawal.t.sol; DomainRegistrarPayments.t.sol | Contract checks passed |
 | R17 | Commit transaction inspection | DomainRegistrarBidRules.ts | Contract checks passed; browser inspection pending |
-| R18 | Frontend/contract commitment conformance | DomainRegistrar.ts; current frontend handler commit/reveal | Encoding verified; browser flow pending |
+| R18 | Frontend/contract commitment conformance | DomainRegistrar.ts; current frontend handler; local browser round #2 | Encoding and one browser reveal verified; broader browser cases pending |
 | R19 | Unauthorized or invalid address update | DomainRegistrarResolution.t.sol | Contract checks passed; browser controls pending |
-| R20 | Backup round trip using `30000000000000001` wei | Contract exact-wei checks exist; browser backup schema/import incomplete | Open: FE-07 |
-| R21 | Modified backup fields or mismatched stored commitment | NtuApp import lacks recomputation/on-chain comparison | Open: FE-07 |
+| R20 | Backup round trip using `30000000000000001` wei | Local browser import recovered two settled 0.06 ETH bids; exact-wei vector not tried | Open: exact-wei case |
+| R21 | Modified backup fields or mismatched stored commitment | Integrated import recomputes and compares with the on-chain digest; only valid imports tried in the browser | Open: tampered and wrong-context cases |
 | R22 | Refresh, wallet/network switching, and new rounds | Global storage key lacks chain/contract context; network guard absent | Open: FE-07 / FE-09 |
 | R23 | Name recipient changes after preview | DomainRegistrarPayments.ts; current handler race check | Atomic call verified; preview confirmation pending |
 | R24 | Recipient matches preview | DomainRegistrarPayments.ts; current handler check; local smoke | Protocol checked; browser confirmation pending |
@@ -34,13 +34,13 @@ Source versions and every captured branch head are recorded in SOURCE_REVISIONS.
 | R26 | Zero payment, unknown name, or reserved name | DomainRegistrarPayments.t.sol | Contract checks passed; browser flow pending |
 | R27 | Successful payment alongside locked auction funds | DomainRegistrarPayments.ts; local smoke | Contract checks passed |
 | R28 | Different settlement and withdrawal orders | DomainRegistrarAccounting.t.sol | Contract checks passed |
-| R29 | Fresh installation and deployment | Fresh contract install/validation and local deployment; Sepolia deployment and separate verification; frontend build repair | Contract/deployment verified; complete browser setup pending |
+| R29 | Fresh installation and deployment | Fresh contract install/validation, local and Sepolia deployment, frontend build and local browser walkthrough | Fresh integrated checkout pending |
 
 ## Course deliverables
 
 | Requirement | Current state |
 | --- | --- |
-| Domain registrar, commit/reveal, ownership and forward resolution | Contract implemented and tested; integrated browser acceptance pending. |
+| Domain registrar, commit/reveal, ownership and forward resolution | Contract tested and one local browser registration/payment flow observed; remaining browser cases pending. |
 | Search, bid/reveal UI and ETH payments by name | Current frontend implements the main screens; latest handler checks verified; remaining findings recorded. |
 | Short test phases and non-reveal policy | 120/120 seconds and 0.001 ETH penalty implemented and exercised. |
 | Specification and validation tooling | Specification and validation workflow documented; available AI workflow evidence is described in the audit report. |

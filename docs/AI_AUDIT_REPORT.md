@@ -1,9 +1,10 @@
 # AI Audit Report — Decentralized .ntu Domain Registrar
 
-Status: working report of the supplied revisions and completed automated checks.
-Frontend fixes, browser acceptance and remaining group history must be incorporated
-before treating this as the final submission report. All results below are scoped
-to recorded commands; expected future results are not presented as completed work.
+Status: working report of the supplied revisions and completed checks.
+Final frontend fixes, remaining browser checks and group history must be incorporated
+before treating this as the final submission report. Automated results are scoped
+to recorded commands; later manual observations are labeled separately. Expected
+future results are not presented as completed work.
 
 Contract base: `cb1f3c4b5bbc04326804089d30991dc69c6a2f60`.
 Reviewed integration base: `16decbda349a26e0a8bd44eb4e216b6edd2e4b70`.
@@ -105,9 +106,9 @@ verification are in `FRONTEND_FINDINGS.md`.
 | FE-04 | Historical pending-name status failure. | Fixed in 16decbd; current handler check passed. |
 | FE-05 | Historical owner/recipient confusion. | Fixed in 16decbd; current handler check passed. |
 | FE-06 | Historical direct transfer; current confirmation gap. | Checked contract path fixed/verified; explicit UI preview/confirmation still open. |
-| FE-07 | Backup context, pre-commit persistence and import validation are incomplete. | Source-confirmed; browser reproduction/fix pending. |
+| FE-07 | Backup recovery and pre-commit persistence are incomplete. | Same-wallet import of two settled bids initially lost commitment IDs and commit times; a local repair restored them in the browser. Pre-commit and negative-path checks remain open. |
 | FE-08 | Historical missing lifecycle screens/operations. | Added in 66b12a2/16decbd; complete browser acceptance pending. |
-| FE-09 | Expected network is not enforced. | Source-confirmed; open. |
+| FE-09 | Expected network is not enforced. | Local contract reads on the wrong wallet chain produced `BAD_DATA`; open. |
 | FE-10 | Invalid name input is silently changed. | Source-confirmed; open. |
 | DEP-01 | Dependency audit reports affected tooling packages. | Compatible update reduced entries from 22 to 13; Zod-related finding remains open. |
 
@@ -170,8 +171,20 @@ All eleven contract tips are included in main, and contract files in 16decbd are
 identical to main. Current handler execution verified four old fixes and the
 checked payment path. Its production build initially failed on four errors;
 removing an unused icon import and an unreferenced component produced a passing
-build. Browser acceptance remains pending. The scope/status of each of the 29
+build. Browser acceptance is partial. The scope/status of each of the 29
 specification criteria is recorded in REQUIREMENTS_COVERAGE.md.
+
+A later manual browser walkthrough combined frontend-wallet `b753e49` with
+registrar-validation `c2f8bcc` on local chain 31337. An unrevealed commitment
+returned 0.099 ETH, and a 0.06 ETH winning bid returned 0.04 ETH after reveal
+and finalization. Both credits were withdrawn. The owner changed the name's
+resolution address, then a 0.01 ETH name payment reached that recipient. The
+local RPC balance check reported recipient 10000.01 ETH and registrar 0.061 ETH
+after the payment. Same-wallet import of both settled records restored their
+on-chain IDs and commit times after a local repair. These browser observations
+are described in `BROWSER_ACCEPTANCE.md`; screenshots and full browser receipts
+have not yet been attached. Two-wallet browser competition, failed imports,
+pre-commit recovery and stale-recipient confirmation remain unverified there.
 
 Dependency changes were followed by the complete validation suite, frontend
 reproductions and local deployment scenario. Current audit outputs distinguish
@@ -190,6 +203,8 @@ verification is claimed. `VALIDATION.md` identifies the evidence and boundaries.
 - Added automated local lifecycle evidence and repeatable validation commands.
 - Added three focused interface/deployment integration tests and five reproducible
   frontend findings with source/version evidence.
+- Recovered on-chain commitment IDs and state during backup import after a local
+  browser check exposed missing IDs; re-import of settled records passed.
 - Updated compatible dependency versions without forcing a Hardhat major downgrade,
   then reran tests. The remaining advisory is explicitly recorded.
 
@@ -217,7 +232,7 @@ suggestions still needed context, reproducible checks and clear ownership of
 integration work. Dependency reports also required interpretation: compatible
 updates removed some findings, while a forced fix proposed breaking changes.
 
-Before submission, incorporate B's fixes and browser results, public Sepolia
+Before submission, incorporate final frontend changes and remaining browser results, public Sepolia
 deployment evidence, and final fresh setup and demo evidence. Identify any
 development history that remains unavailable and keep unresolved limitations
 visible in the submitted report.
