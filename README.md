@@ -24,8 +24,16 @@ npm run validate
 
 `validate` builds the contract, exports its ABI, typechecks the scripts, and runs
 the Solidity and TypeScript tests. For a shorter rerun, use `npm test` from
-`contracts`. To check the web build, run `npm ci` and `npm run build` from
+`contracts`. `npm run check:frontend` runs the focused integration test against
+the current frontend handler. `npm run check:frontend-archived` reproduces an
+older captured frontend revision for historical comparison. To check the web
+build, run `npm ci` and `npm run build` from
 `frontend`.
+
+The committed Sepolia record includes the original compiler line ending. The
+verification script replays that compiler input when a checkout uses different
+line endings; the offline deployment integration test checks the replayed
+creation hash without requiring testnet credentials.
 
 ## Run locally
 

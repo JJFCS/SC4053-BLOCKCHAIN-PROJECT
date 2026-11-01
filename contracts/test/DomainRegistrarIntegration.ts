@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { expect } from "chai";
 import { describe, it } from "mocha";
 import { artifacts, network } from "hardhat";
-import { canonicalInterface, loadAbi, verifyDeployment, sha256, sourceBaseRevision, contractsRoot, type DeploymentRecord } from "../scripts/lib/deployment.js";
+import { canonicalInterface, loadAbi, replayCreationBytecode, verifyDeployment, sha256, sourceBaseRevision, contractsRoot, type DeploymentRecord } from "../scripts/lib/deployment.js";
 import path from "node:path";
 
 const { ethers, networkHelpers } = await network.create();
@@ -16,6 +16,14 @@ describe("DomainRegistrar deployment and published ABI integration", function ()
     assert.equal(iface.getFunction("getRound")!.outputs[0].components!.length, 8);
     assert.equal(iface.getFunction("getCommitmentForRound")!.outputs[0].components!.length, 9);
     assert.equal(iface.getFunction("sendToDomain")!.stateMutability, "payable");
+  });
+
+  it("replays the published Sepolia creation data from the original CRLF compiler input", async function () {
+    const record = JSON.parse(await readFile(path.join(contractsRoot, "deployments/11155111.json"), "utf8")) as DeploymentRecord;
+    assert.ok(record.compilerReplay);
+    const bytecode = await replayCreationBytecode(record.compilerReplay);
+    const constructorData = new ethers.Interface(await loadAbi()).encodeDeploy([record.treasury]).slice(2);
+    assert.equal(ethers.keccak256(bytecode + constructorData), record.creationDataHash);
   });
 
   it("binds deployment evidence to its chain, code, source, ABI, receipt and treasury", async function () {

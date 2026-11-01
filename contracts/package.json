@@ -25,7 +25,8 @@
     "verify:local": "hardhat run scripts/verify-deployment.ts --network localhost",
     "smoke:local": "hardhat run scripts/smoke-local.ts --network localhost",
     "validate": "node scripts/validate.mjs",
-    "check:frontend": "hardhat run scripts/check-frontend.ts",
+    "check:frontend": "hardhat test mocha test/FrontendCurrentFlow.ts",
+    "check:frontend-archived": "hardhat run scripts/check-frontend.ts",
     "audit:frontend-history": "hardhat run scripts/reproduce-frontend-history.ts"
   }
 }

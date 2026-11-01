@@ -37,6 +37,7 @@ their outputs were supplied separately on 27 October.
 | Deployment verification | Passed before and after the transaction scenario. |
 | Public Sepolia deployment | Windows command output: chain 11155111; registrar `0x9dbe733cDB4F8BBB6a960177c2c3bB7E005819F9`; treasury/deployer `0x20Dc8080A1e86d2e2E80FbF9E6FAe548073B0c6F`; transaction `0xb07b99bb1b8e63c1610ab77b9103f1665045a837eb70cd684ca3157915d55408`. |
 | Public Sepolia verification | Separate `verify-deployment.ts` command reported `verified: true`, chain 11155111, same address, and `currentRoundId: 0`. |
+| Sepolia compiler replay on LF checkout | Isolated Hardhat 0.8.34 build from the recorded CRLF registrar source and forge-std remapping produced the exact recorded creation hash `0x2694ea5cd0d5d7927c62df6502b094fa07ee208568f6f1ac266acf5e7edd6bff`. The focused integration test passed without testnet credentials. Public RPC verification from this checkout remains unperformed. |
 | Local transaction scenario | Passed: competing bids, late reveal ordering, older finalization during a newer round, all three refund outcomes, withdrawals, address update and checked payment. |
 | Invalid deployment configuration | Zero treasury and ephemeral deployment requests were rejected before a deployment transaction. |
 | Frontend locked install | Passed. |
@@ -83,6 +84,15 @@ requires an upstream-compatible fix or a separately tested toolchain migration;
 controlling configuration inputs does not count as patching the dependency.
 Raw before/update/after outputs are retained as evidence.
 
+Decision on the 1 November lockfile: retain the already validated compatible
+Hardhat 3 update and record the remaining development-tool advisories. The
+reported direct fixes require major changes or downgrades to Hardhat/toolbox
+and Mocha. No compatible, tested remediation for the remaining 13 high and 5
+moderate entries has been established; `npm audit --offline` cannot verify
+their absence because it has no advisory data. Do not treat its empty result
+as a clean online audit. Reassess with an online audit and full test rerun if
+the toolchain is changed before submission.
+
 ## Evidence and boundaries
 
 - `docs/evidence/validation-*`: generated build/export/typecheck/test logs and exit codes.
@@ -126,9 +136,9 @@ With `contracts/test/FrontendCurrentFlow.ts` added on the Windows checkout,
 `npm.cmd test` reported **180 passing (153 Solidity, 27 Mocha)**, and the
 frontend TypeScript/Vite build passed. That test exercises the *current*
 handler's preapproval record, rejected wallet request, wrong-chain guard,
-stale-recipient rejection and fresh payment. `npm run check:frontend` still
-targets the archived 16decbd fixture and should not be used as evidence for
-the latest handler.
+stale-recipient rejection and fresh payment. At the time of this run,
+`npm run check:frontend` still targeted the archived 16decbd fixture; the
+command was corrected in the later follow-up below.
 
 A separate clean local clone of `67f8874` plus reviewable patches installed
 both lockfiles offline, passed the 180-test suite and frontend build, deployed
@@ -154,6 +164,27 @@ These later browser results came from reported on-screen output; full receipts
 and screenshots were not captured in the repository. A browser reload during
 a pending wallet transaction or delayed receipt and a live stale-recipient
 race remain unobserved.
+
+## Current frontend regression command, 2 November
+
+`npm run check:frontend` now runs the existing `test/FrontendCurrentFlow.ts`
+against the current frontend handler. A focused run passed with one Mocha test
+covering preapproval recovery, wallet rejection, the network guard and a
+stale-recipient payment followed by fresh preview. The older fixture remains
+available as `npm run check:frontend-archived`. This command change does not
+add a new browser observation or alter the earlier 180-test total.
+
+## Sepolia compiler replay, 2 November
+
+The public deployment record now stores the original CRLF source line ending.
+An isolated Hardhat build of that original input on the LF checkout matched
+the published creation hash byte for byte. The focused replay test passed.
+The verifier uses this replay only when its current checkout artifact does
+not match the recorded creation transaction. This resolves the checkout
+metadata mismatch in code, subject to an on-chain rerun from an LF checkout
+with a Sepolia RPC. No wallet key is needed for the offline replay test.
+The full local suite passed 181 tests (153 Solidity, 28 Mocha) after this
+change; the current frontend handler check and TypeScript typecheck passed.
 
 ## Remaining integration work
 

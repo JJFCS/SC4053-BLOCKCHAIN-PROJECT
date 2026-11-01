@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { copyFile, readFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { Contract, Interface, getAddress, keccak256, ZeroAddress, type Provider } from "ethers";
@@ -29,6 +29,7 @@ export interface DeploymentRecord {
   runtimeCodeHash: string;
   creationDataHash: string;
   initialRoundId: string;
+  compilerReplay?: { version: "0.8.34"; sourceLineEnding: "LF" | "CRLF" };
 }
 
 export async function loadAbi() {
@@ -54,6 +55,42 @@ export function gitState() {
   }
 }
 
+// Hardhat's compiler metadata hashes the exact source bytes. The public Sepolia
+// deployment was compiled from CRLF source on Windows. Rebuild that input in an
+// isolated project so an LF checkout can still verify the full creation data.
+export async function replayCreationBytecode(replay: NonNullable<DeploymentRecord["compilerReplay"]>) {
+  assert.equal(replay.version, "0.8.34", "Unknown recorded compiler version");
+  assert.ok(replay.sourceLineEnding === "LF" || replay.sourceLineEnding === "CRLF", "Unknown recorded source line ending");
+  const cacheRoot = path.join(contractsRoot, ".audit-cache");
+  await mkdir(cacheRoot, { recursive: true });
+  const replayRoot = await mkdtemp(path.join(cacheRoot, "deployment-replay-"));
+  try {
+    const sourceRoot = path.join(contractsRoot, "contracts");
+    const replaySources = path.join(replayRoot, "contracts");
+    await mkdir(replaySources);
+    const normalized = (await readFile(path.join(sourceRoot, "DomainRegistrar.sol"), "utf8")).replaceAll("\r\n", "\n");
+    await writeFile(path.join(replaySources, "DomainRegistrar.sol"),
+      replay.sourceLineEnding === "CRLF" ? normalized.replaceAll("\n", "\r\n") : normalized);
+    // The original build included forge-std tests. This small source causes
+    // Hardhat to retain their exact package remapping in compiler metadata.
+    await writeFile(path.join(replaySources, "ReplayRemapping.t.sol"),
+      '// SPDX-License-Identifier: UNLICENSED\npragma solidity 0.8.34;\n' +
+      'import { Test } from "forge-std/Test.sol";\ncontract ReplayRemapping is Test {}\n');
+    await copyFile(path.join(contractsRoot, "package.json"), path.join(replayRoot, "package.json"));
+    await writeFile(path.join(replayRoot, "hardhat.config.ts"),
+      'import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";\n' +
+      'import { defineConfig } from "hardhat/config";\n' +
+      `export default defineConfig({ plugins: [hardhatToolboxMochaEthersPlugin], solidity: { profiles: { default: { version: "${replay.version}" } } } });\n`);
+    execFileSync(process.execPath, [path.join(contractsRoot, "node_modules/hardhat/dist/src/cli.js"),
+      "--config", path.join(replayRoot, "hardhat.config.ts"), "build"],
+      { cwd: replayRoot, stdio: "pipe" });
+    const artifact = JSON.parse(await readFile(path.join(replayRoot, "artifacts/contracts/DomainRegistrar.sol/DomainRegistrar.json"), "utf8"));
+    return artifact.bytecode as string;
+  } finally {
+    await rm(replayRoot, { recursive: true, force: true });
+  }
+}
+
 export async function verifyDeployment(provider: Provider, record: DeploymentRecord) {
   assert.equal((await provider.getNetwork()).chainId.toString(), record.chainId, "Connected chain differs from deployment record");
   const abi = await loadAbi();
@@ -72,7 +109,13 @@ export async function verifyDeployment(provider: Provider, record: DeploymentRec
   assert.equal(transaction.from.toLowerCase(), record.deployer.toLowerCase());
   assert.equal(keccak256(transaction.data), record.creationDataHash, "Creation transaction differs from record");
   const artifact = JSON.parse(await readFile(path.join(contractsRoot, "artifacts/contracts/DomainRegistrar.sol/DomainRegistrar.json"), "utf8"));
-  const expectedCreationData = artifact.bytecode + new Interface(abi).encodeDeploy([record.treasury]).slice(2);
+  const constructorData = new Interface(abi).encodeDeploy([record.treasury]).slice(2);
+  let creationBytecode = artifact.bytecode as string;
+  if (transaction.data.toLowerCase() !== (creationBytecode + constructorData).toLowerCase()) {
+    assert.ok(record.compilerReplay, "Creation bytecode differs and no original compiler input is recorded");
+    creationBytecode = await replayCreationBytecode(record.compilerReplay);
+  }
+  const expectedCreationData = creationBytecode + constructorData;
   assert.equal(transaction.data.toLowerCase(), expectedCreationData.toLowerCase(), "Deployment was not created from the current compiled registrar and constructor argument");
   const contract = new Contract(address, abi, provider);
   assert.equal(getAddress(await contract.getFunction("treasury")()), getAddress(record.treasury));

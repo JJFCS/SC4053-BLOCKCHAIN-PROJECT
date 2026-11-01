@@ -89,7 +89,8 @@ have not all been recorded manually.
 
 ## Test provenance
 
-`npm run check:frontend` still executes an archived `16decbd` fixture, not the
-new working-tree handler. `contracts/test/FrontendCurrentFlow.ts` tests the
-current handler against a simulated EVM and passed in the 180-test run. The
-browser observations and limits are in `BROWSER_ACCEPTANCE.md`.
+`npm run check:frontend` now executes `contracts/test/FrontendCurrentFlow.ts`
+against the current handler and simulated EVM. Its focused rerun passed on
+2 November. The earlier `16decbd` fixture remains available under
+`npm run check:frontend-archived` for historical comparison. The browser
+observations and limits are in `BROWSER_ACCEPTANCE.md`.

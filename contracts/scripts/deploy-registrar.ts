@@ -29,6 +29,7 @@ try {
   const initialRoundId = await registrar.getCurrentRound();
   assert.equal(initialRoundId, 0n, "Deployment must not silently start the auction");
   const source = (await readFile(path.join(contractsRoot, "contracts/DomainRegistrar.sol"), "utf8")).replaceAll("\r\n", "\n");
+  const originalSource = await readFile(path.join(contractsRoot, "contracts/DomainRegistrar.sol"), "utf8");
   const record: DeploymentRecord = {
     schemaVersion: 1, recordedAt: new Date().toISOString(), network: connection.networkName,
     chainId: chainId.toString(), address, treasury, deployer: signers[0].address,
@@ -36,6 +37,7 @@ try {
     sourceBaseRevision, ...gitState(), sourceSha256: sha256(source),
     abiSha256: sha256(JSON.stringify(abi)), runtimeCodeHash: ethers.keccak256(await ethers.provider.getCode(address)),
     creationDataHash: ethers.keccak256(transaction.data), initialRoundId: initialRoundId.toString(),
+    compilerReplay: { version: "0.8.34", sourceLineEnding: originalSource.includes("\r\n") ? "CRLF" : "LF" },
   };
   await verifyDeployment(ethers.provider, record);
   await saveRecord(record);

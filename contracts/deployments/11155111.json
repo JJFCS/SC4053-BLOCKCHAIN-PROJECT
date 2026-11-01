@@ -15,5 +15,9 @@
   "abiSha256": "914bbe560661b99269ab569b1f860266b65b9a28cdb1592ff1070bef71350f2f",
   "runtimeCodeHash": "0x70da921817ec30650e6799dab390a146e85f304e856eda5b3d9469b6d7aa4797",
   "creationDataHash": "0x2694ea5cd0d5d7927c62df6502b094fa07ee208568f6f1ac266acf5e7edd6bff",
-  "initialRoundId": "0"
+  "initialRoundId": "0",
+  "compilerReplay": {
+    "version": "0.8.34",
+    "sourceLineEnding": "CRLF"
+  }
 }
