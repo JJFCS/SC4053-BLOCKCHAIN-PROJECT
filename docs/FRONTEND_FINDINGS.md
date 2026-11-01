@@ -11,7 +11,7 @@ actual retests. Older reproductions remain in `history/frontend-7217ac7.md`.
 | FE-01 | Unused icon and orphan component originally broke production build; repaired and build passed. |
 | FE-02–FE-05 | Short-name, round-zero, reservation and owner/recipient mismatches were historical; the later handler passed these checks. |
 | FE-06 | Contract payment already used the checked path. The added full recipient/amount/chain preview was observed with cancellation and then a successful 0.001 ETH browser payment. Stale-recipient race passed in current-handler EVM test, not live browser. |
-| FE-07 | Browser import originally lost IDs and times; repair restored #1/#2. Exact #7 wei and wrong-context/tampered imports passed. Round #7 prepared record survived reload after canceling webpage confirmation. Pending wallet receipt/reload and MetaMask rejection during bid submission remain unobserved in browser. |
+| FE-07 | Browser import originally lost IDs and times; repair restored #1/#2. Exact #7 wei and wrong-context/tampered imports passed. Round #7 prepared record survived reload after canceling webpage confirmation. A fresh local round #1 MetaMask rejection also preserved the prepared record. Round #2 preserved a pending transaction across reload; after MetaMask reported a failed transaction, receipt reconciliation changed the stale Submitted label to Commit failed. Successful pending-receipt reconciliation remains unobserved. |
 | FE-08 | Auction lifecycle screens exercised through seven local rounds. |
 | FE-09 | Wrong-chain `BAD_DATA` and mislabeled navbar reproduced. Corrected local navbar and visible chain-mismatch warning observed; search and write actions were blocked with wallet on 11155111 and registrar configured for 31337. |
 | FE-10 | Input originally filtered unsupported characters; after correction `bad_name` remained visible and Search rejected it. No wrong-name transaction was observed. |
@@ -54,9 +54,16 @@ malformed salt, wrong chain/contract/wallet backups were rejected without
 replacing valid records. In round #7 the webpage confirmation was canceled
 before MetaMask; after refresh, the record still showed **Prepared, not
 submitted**, no commitment ID, and older records remained. No deposit was
-submitted. A pending-wallet-receipt reload was not exercised. The current
-handler test covers rejected wallet approval with no on-chain commitment, but
-that particular rejection was not observed in the browser.
+submitted. In the 2 November fresh-chain follow-up, rejecting a MetaMask
+commit approval similarly left a prepared record after refresh. A round #2
+transaction remained Submitted with no ID after reloading during a paused
+mining interval. MetaMask then reported failure, while the original UI kept
+showing Submitted. The correction polls saved transaction receipts and verifies
+successful commitments against the registrar; a failed receipt marks the
+record Commit failed without erasing the preimage. After the local patch and
+refresh, the browser showed Commit failed. The transaction's revert cause was
+not established. A successful receipt arriving after reload still needs a
+browser check.
 
 The prepared record appeared as **Unrevealed** under the generic Your
 commitments list even though it had no on-chain ID. This is a wording issue to

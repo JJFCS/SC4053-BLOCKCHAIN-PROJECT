@@ -234,6 +234,9 @@ export interface Commitment {
 
   txHash: string
 
+  // A mined, reverted commit has a transaction hash but no on-chain bid.
+  submissionFailed?: boolean
+
   createdAt: number
 
   revealed: boolean
@@ -241,6 +244,34 @@ export interface Commitment {
   valid?: boolean
 
   settled?: boolean
+}
+
+export async function reconcileSubmittedCommitment(record: Commitment): Promise<Commitment> {
+  if (!record.txHash || record.commitmentId || record.submissionFailed) return record
+  if (record.chainId !== getExpectedChainId().toString() ||
+      record.registrarAddress?.toLowerCase() !== getRegistrarAddress().toLowerCase()) return record
+
+  const contract = await getReadContract()
+  const receipt = await getProvider().getTransactionReceipt(record.txHash)
+  if (!receipt) return record
+
+  if (receipt.status !== 1 ||
+      receipt.from.toLowerCase() !== record.bidder.toLowerCase() ||
+      receipt.to?.toLowerCase() !== getRegistrarAddress().toLowerCase()) {
+    return { ...record, submissionFailed: true }
+  }
+
+  const commitmentId: bigint = await contract.getCommitmentId(BigInt(record.roundId), record.bidder)
+  if (commitmentId === 0n) return { ...record, submissionFailed: true }
+
+  const stored = await contract.getCommitment(commitmentId)
+  if (stored.digest.toLowerCase() !== record.hash.toLowerCase() ||
+      stored.bidder.toLowerCase() !== record.bidder.toLowerCase() ||
+      stored.roundId !== BigInt(record.roundId)) {
+    return { ...record, submissionFailed: true }
+  }
+
+  return { ...record, commitmentId: commitmentId.toString(), submissionFailed: false }
 }
 
 export interface RoundState {

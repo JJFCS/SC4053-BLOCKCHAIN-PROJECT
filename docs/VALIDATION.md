@@ -161,9 +161,12 @@ write controls were unavailable; no transaction was attempted. Stored bids
 remained visible. See BROWSER_ACCEPTANCE.md.
 
 These later browser results came from reported on-screen output; full receipts
-and screenshots were not captured in the repository. A browser reload during
-a pending wallet transaction or delayed receipt and a live stale-recipient
-race remain unobserved.
+and screenshots were not captured in the repository. On 2 November, a fresh
+local round preserved a pending commit across reload with no ID. MetaMask
+reported that transaction failed; the original UI stayed Submitted, and a
+local receipt-reconciliation correction subsequently displayed Commit failed.
+The revert reason was not established. A successful delayed receipt after
+reload and a live stale-recipient race remain unobserved.
 
 ## Current frontend regression command, 2 November
 
@@ -188,8 +191,8 @@ change; the current frontend handler check and TypeScript typecheck passed.
 
 ## Remaining integration work
 
-1. Document the unobserved pending-receipt and live browser stale-recipient
-   cases without claiming they passed.
+1. Check successful receipt reconciliation after reload and the live browser
+   stale-recipient race without claiming they passed from the failed-receipt run.
 2. Record the final integrated revision and have a teammate reproduce the
    browser/wallet flow from that revision.
 3. Keep the 13 high/5 moderate dependency finding visible unless a compatible

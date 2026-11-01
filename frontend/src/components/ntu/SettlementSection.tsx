@@ -240,7 +240,9 @@ import {
                         </dt>
   
                         <dd className="text-right text-zinc-800">
-                          {commitment.revealed
+                          {commitment.submissionFailed
+                            ? "No on-chain bid"
+                            : commitment.revealed
                             ? "Revealed"
                             : "Not revealed"}
                         </dd>
@@ -344,6 +346,14 @@ import {
   }: {
     commitment: Commitment
   }) {
+    if (commitment.submissionFailed) {
+      return (
+        <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs text-red-800">
+          Commit failed
+        </span>
+      )
+    }
+
     if (
       commitment.settled
     ) {

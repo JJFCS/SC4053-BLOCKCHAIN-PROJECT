@@ -123,7 +123,7 @@ export function RevealSection({
                     settled={
                       !!c.settled
                     }
-                    submissionStatus={c.commitmentId ? "confirmed" : c.txHash ? "submitted" : "prepared"}
+                    submissionStatus={c.submissionFailed ? "failed" : c.commitmentId ? "confirmed" : c.txHash ? "submitted" : "prepared"}
                     valid={
                       c.valid
                     }
@@ -223,7 +223,8 @@ export function RevealSection({
                       disabled={
                         !inReveal ||
                         !correctWallet ||
-                        (!c.txHash && !c.commitmentId)
+                        (!c.txHash && !c.commitmentId) ||
+                        !!c.submissionFailed
                       }
                       loading={
                         revealingHash ===
@@ -233,7 +234,9 @@ export function RevealSection({
                         onReveal(c)
                       }
                     >
-                      {!account
+                      {c.submissionFailed
+                        ? "Commit failed; no on-chain bid"
+                        : !account
                         ? "Connect wallet to reveal"
                         : !correctWallet
                           ? "Switch to original wallet"
@@ -268,10 +271,14 @@ function CommitmentBadge({
 }: {
   revealed: boolean
   settled: boolean
-  submissionStatus: "prepared" | "submitted" | "confirmed"
+  submissionStatus: "prepared" | "submitted" | "confirmed" | "failed"
   valid?: boolean
   ready: boolean
 }) {
+  if (submissionStatus === "failed") {
+    return <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs text-red-800">Commit failed</span>
+  }
+
   if (submissionStatus === "prepared") {
     return <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs text-amber-800">Prepared, not submitted</span>
   }

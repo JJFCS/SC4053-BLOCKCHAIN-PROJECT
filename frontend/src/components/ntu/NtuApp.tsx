@@ -63,6 +63,7 @@ import {
   getRegistrarAddress,
   getWithdrawalCredit,
   previewPayment,
+  reconcileSubmittedCommitment,
   revealBid,
   sendPayment,
   setResolutionAddress,
@@ -445,6 +446,60 @@ export default function NtuApp() {
   }, [
     commitments,
   ])
+
+  // A reload can interrupt tx.wait(). Keep the preimage and reconcile the
+  // saved transaction hash with its receipt and the registrar's own record.
+  useEffect(() => {
+    let active = true
+    let checking = false
+
+    const checkSubmitted = async () => {
+      if (checking) return
+      checking = true
+      try {
+        const pending = loadStoredCommitments().filter((record) =>
+          record.txHash && !record.commitmentId && !record.submissionFailed
+        )
+        if (pending.length === 0) return
+
+        const checked = await Promise.all(pending.map(async (record) => {
+          try {
+            return await reconcileSubmittedCommitment(record)
+          } catch {
+            // Keep the submitted record while the wallet, RPC, or chain is unavailable.
+            return record
+          }
+        }))
+        if (!active) return
+
+        const updates = new Map(checked.filter((record) =>
+          record.commitmentId || record.submissionFailed
+        ).map((record) => [record.hash, record]))
+        if (updates.size === 0) return
+
+        setCommitments((previous) => {
+          let changed = false
+          const next = previous.map((record) => {
+            const update = updates.get(record.hash)
+            if (!update || record.commitmentId || record.submissionFailed ||
+                record.txHash !== update.txHash) return record
+            changed = true
+            return { ...record, ...update }
+          })
+          return changed ? next : previous
+        })
+      } finally {
+        checking = false
+      }
+    }
+
+    void checkSubmitted()
+    const timer = window.setInterval(() => void checkSubmitted(), 5000)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [])
 
   /*
     ========================================================
