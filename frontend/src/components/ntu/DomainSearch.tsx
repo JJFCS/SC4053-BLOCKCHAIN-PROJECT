@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from "react"
 import { Search, Loader2 } from "lucide-react"
-import { sanitizeLabel } from "./handlers"
 
 export function DomainSearch({
   loading,
@@ -36,7 +35,7 @@ export function DomainSearch({
             <input
               id="domain-search"
               value={value}
-              onChange={(e) => setValue(sanitizeLabel(e.target.value))}
+              onChange={(e) => setValue(e.target.value)}
               placeholder="yourname"
               autoComplete="off"
               spellCheck={false}

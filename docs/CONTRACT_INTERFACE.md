@@ -159,7 +159,9 @@ Test references:
 - contracts/test/DomainRegistrarBidRules.ts:80 uses a bid beyond Number's exact integer range.
 - contracts/test/DomainRegistrarAccounting.ts:36 preserves 30000000000000001 wei exactly.
 
-These contract tests do not verify the future browser's backup export/import implementation.
+Contract tests alone do not verify browser backup export/import. Later manual
+results and current-handler coverage are recorded separately in
+`BROWSER_ACCEPTANCE.md` and `REQUIREMENTS_COVERAGE.md`.
 
 ## Settlement and withdrawals
 

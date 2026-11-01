@@ -184,10 +184,10 @@ import {
       schemaVersion: 1,
   
       chainId:
-        network.chainId.toString(),
+        commitment.chainId ?? network.chainId.toString(),
   
       registrarAddress:
-        requireRegistrarAddress(),
+        commitment.registrarAddress ?? requireRegistrarAddress(),
   
       bidderAddress:
         commitment.bidder,
@@ -610,6 +610,9 @@ import {
     return {
       commitmentId:
         verified.commitmentId,
+
+      chainId: backup.chainId,
+      registrarAddress: backup.registrarAddress,
 
       roundId:
         backup.roundId,

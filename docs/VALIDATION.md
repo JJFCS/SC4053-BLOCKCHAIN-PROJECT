@@ -65,6 +65,17 @@ and its dependent tooling packages. This is an open dependency finding, not a
 clean audit result. The installed Zod 3.x interface is used by Hardhat. A forced
 fix proposes incompatible major tooling changes and was not applied.
 
+A later `npm audit --json` on 1 November 2026, against the same locked contract
+toolchain, reported 18 affected package entries: 13 high and 5 moderate. High
+entries propagate through Hardhat plugins from Zod. Moderate entries include
+Mocha, glob, minimatch and TypeChain dependants. These are package entries,
+not 18 independent exploits. The audit's proposed fixes for direct Hardhat,
+toolbox and Mocha dependencies involve major-version changes, including
+downgrades; they were not applied without a compatible migration and rerun.
+No runtime exploit or production deployment exposure was demonstrated.
+The lockfile hash, affected package names, severities, advisory references and
+reported fix options are captured in `docs/evidence/audit-summary-2026-11-01.json`.
+
 The advisory describes resource exhaustion during validation of oversized
 collections: https://github.com/advisories/GHSA-mrhx-c7xc-m3w5 . Exploitability
 against this particular developer workflow was not demonstrated. Further action
@@ -88,7 +99,8 @@ The local node used for captured evidence was stopped after testing. Its hashes
 are local evidence, not public explorer links or an address hosted for teammates.
 The Sepolia deployment above supplies a shared address for the current browser
 integration. No Slither, formal verification, or complete Windows suite rerun is
-claimed by the automated record. The public explorer page was
+claimed by the earlier automated record; a later Windows 180-test run is noted
+below. The public explorer page was
 not independently loaded in this review; the separate network verification
 command reported success.
 
@@ -108,10 +120,47 @@ Wrong-chain reads showed `BAD_DATA`, the navbar labeled the local network
 Sepolia, and Refresh appeared to stall at countdown zero until page reload.
 Remaining browser paths are marked pending in the checklist.
 
+## Subsequent integration checks through 1 November
+
+With `contracts/test/FrontendCurrentFlow.ts` added on the Windows checkout,
+`npm.cmd test` reported **180 passing (153 Solidity, 27 Mocha)**, and the
+frontend TypeScript/Vite build passed. That test exercises the *current*
+handler's preapproval record, rejected wallet request, wrong-chain guard,
+stale-recipient rejection and fresh payment. `npm run check:frontend` still
+targets the archived 16decbd fixture and should not be used as evidence for
+the latest handler.
+
+A separate clean local clone of `67f8874` plus reviewable patches installed
+both lockfiles offline, passed the 180-test suite and frontend build, deployed
+and independently verified a local registrar, ran the smoke scenario and
+served Vite's HTML with matching chain/address settings. This reproduced the
+README command path in a new directory, not a browser walkthrough of a final
+commit by another teammate.
+
+Manual browser rounds #3–#7 covered higher-bid and earlier-commit tie winners,
+two names sharing a round, older unfinished names, loser/winner/non-reveal
+refunds, a zero-refund winner, exact-wei backup import and rejected wrong-
+context/tampered imports. Round #7's downloaded backup and locally prepared
+record survived a reload after the webpage submission was canceled, before
+MetaMask, with older records intact. The revised payment UI displayed full
+recipient, 0.001 ETH and chain 31337; a declined attempt was handled and a
+later 0.001 ETH payment by name succeeded. The old wrong-chain `BAD_DATA`
+became an explicit visible warning. With site wallet chain 11155111 and
+configured registrar chain 31337, search returned the mismatch warning and
+write controls were unavailable; no transaction was attempted. Stored bids
+remained visible. See BROWSER_ACCEPTANCE.md.
+
+These later browser results came from reported on-screen output; full receipts
+and screenshots were not captured in the repository. A browser reload during
+a pending wallet transaction or delayed receipt and a live stale-recipient
+race remain unobserved.
+
 ## Remaining integration work
 
-1. Complete the remaining recovery, recipient-confirmation and network checks against the current frontend.
-2. Complete the remaining browser checklist cases on the final version.
-3. State the limits of the available team tooling and development history in the report.
-4. The group addresses or explicitly evaluates the remaining dependency finding,
-   then completes the audit report, fresh installation check and demo video.
+1. Document the unobserved pending-receipt and live browser stale-recipient
+   cases without claiming they passed.
+2. Record the final integrated revision and have a teammate reproduce the
+   browser/wallet flow from that revision.
+3. Keep the 13 high/5 moderate dependency finding visible unless a compatible
+   update is actually applied and retested. Finish the group code package and
+   demo video.

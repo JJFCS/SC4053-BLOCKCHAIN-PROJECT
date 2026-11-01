@@ -32,6 +32,11 @@ const REGISTRAR_ADDRESS =
     | string
     | undefined
 
+const EXPECTED_CHAIN_ID =
+  import.meta.env.VITE_CHAIN_ID as
+    | string
+    | undefined
+
 /*
   ABI matching the final DomainRegistrar.sol.
 
@@ -190,6 +195,10 @@ export interface Commitment {
     initially contain it.
   */
   commitmentId?: string
+
+  // Recorded at preparation time so switching chains cannot relabel a backup.
+  chainId?: string
+  registrarAddress?: string
 
   /*
     uint256 values are stored as decimal strings.
@@ -441,6 +450,30 @@ export function getRegistrarAddress(): string {
   return REGISTRAR_ADDRESS
 }
 
+export function getExpectedChainId(): bigint {
+  if (!EXPECTED_CHAIN_ID || !/^[0-9]+$/.test(EXPECTED_CHAIN_ID)) {
+    throw new Error("Configure VITE_CHAIN_ID for the registrar deployment.")
+  }
+
+  return BigInt(EXPECTED_CHAIN_ID)
+}
+
+async function assertConfiguredNetwork(provider: BrowserProvider): Promise<void> {
+  const expected = getExpectedChainId()
+  const actual = (await provider.getNetwork()).chainId
+
+  if (actual !== expected) {
+    throw new Error(
+      `Wrong network: wallet chain ${actual}, registrar chain ${expected}. Switch the site's MetaMask network to chain ${expected}.`
+    )
+  }
+
+  const code = await provider.getCode(getRegistrarAddress())
+  if (code === "0x") {
+    throw new Error("No registrar contract exists at the configured address on this chain. Redeploy and update the frontend configuration.")
+  }
+}
+
 /*
   ============================================================
   ERROR MESSAGES
@@ -598,6 +631,8 @@ async function getReadContract() {
   const provider =
     getProvider()
 
+  await assertConfiguredNetwork(provider)
+
   return new Contract(
     getRegistrarAddress(),
     REGISTRAR_ABI,
@@ -608,6 +643,8 @@ async function getReadContract() {
 async function getWriteContract() {
   const provider =
     getProvider()
+
+  await assertConfiguredNetwork(provider)
 
   const signer =
     await provider.getSigner()
@@ -1252,6 +1289,10 @@ export async function commitBid(
     amount: string
 
     salt: string
+  },
+  hooks?: {
+    onPrepared: (record: Commitment) => Promise<void>
+    onSubmitted: (record: Commitment) => void
   }
 ): Promise<Commitment> {
   const name =
@@ -1403,6 +1444,25 @@ export async function commitBid(
         params.salt,
     })
 
+  const prepared: Commitment = {
+    roundId: roundId.toString(),
+    chainId: (await provider.getNetwork()).chainId.toString(),
+    registrarAddress: getRegistrarAddress(),
+    bidder,
+    name,
+    amount: params.amount,
+    bidWei: bidWei.toString(),
+    salt: params.salt,
+    hash: digest,
+    txHash: "",
+    createdAt: Date.now(),
+    revealed: false,
+    settled: false,
+  }
+
+  // The preimage must be durable and backed up before requesting wallet approval.
+  await hooks?.onPrepared(prepared)
+
   /*
     Frontend-facing contract function from
     the specification.
@@ -1417,6 +1477,8 @@ export async function commitBid(
           deposit,
       }
     )
+
+  hooks?.onSubmitted({ ...prepared, txHash: tx.hash })
 
   const receipt =
     await tx.wait()
@@ -1495,49 +1557,7 @@ export async function commitBid(
     )
   }
 
-  return {
-    commitmentId,
-
-    roundId:
-      roundId.toString(),
-
-    bidder,
-
-    name,
-
-    /*
-      Display copy.
-    */
-    amount:
-      params.amount,
-
-    /*
-      Exact canonical value.
-    */
-    bidWei:
-      bidWei.toString(),
-
-    salt:
-      params.salt,
-
-    hash:
-      digest,
-
-    txHash:
-      tx.hash,
-
-    createdAt:
-      Date.now(),
-
-    revealed:
-      false,
-
-    valid:
-      undefined,
-
-    settled:
-      false,
-  }
+  return { ...prepared, commitmentId, txHash: tx.hash }
 }
 
 /*
@@ -2101,17 +2121,20 @@ export async function setResolutionAddress(
   forwarding payment.
 */
 
-export async function sendPayment(
+export interface PaymentPreview {
+  name: string
+  amount: string
+  resolvedAddress: string
+  chainId: string
+}
+
+export async function previewPayment(
   params: {
     name: string
 
     amount: string
   }
-): Promise<{
-  resolvedAddress: string
-
-  txHash: string
-}> {
+): Promise<PaymentPreview> {
   const name =
     normalizeLabel(
       params.name
@@ -2154,14 +2177,35 @@ export async function sendPayment(
     )
   }
 
-  /*
-    Preview recipient.
-  */
-
   const resolvedAddress =
     await resolveDomain(
       name
     )
+
+  const chainId = (await getProvider().getNetwork()).chainId.toString()
+
+  return { name, amount: params.amount, resolvedAddress, chainId }
+}
+
+export async function sendPayment(
+  preview: PaymentPreview
+): Promise<{
+  resolvedAddress: string
+  txHash: string
+}> {
+  const name = normalizeLabel(preview.name)
+  const validation = validateLabel(name)
+  if (!validation.valid) throw new Error(validation.error ?? "Invalid domain name.")
+
+  const amountWei = parseEther(preview.amount)
+  if (amountWei <= 0n) throw new Error("Payment amount must be greater than zero.")
+  if (!isAddress(preview.resolvedAddress) || preview.resolvedAddress === ZeroAddress) {
+    throw new Error("The confirmed recipient is invalid. Review the domain again.")
+  }
+
+  if ((await getProvider().getNetwork()).chainId.toString() !== preview.chainId) {
+    throw new Error("The network changed. Review the recipient and network again.")
+  }
 
   const contract =
     await getWriteContract()
@@ -2177,7 +2221,7 @@ export async function sendPayment(
   const tx =
     await contract.sendToDomain(
       name,
-      resolvedAddress,
+      preview.resolvedAddress,
       {
         value:
           amountWei,
@@ -2187,7 +2231,7 @@ export async function sendPayment(
   await tx.wait()
 
   return {
-    resolvedAddress,
+    resolvedAddress: preview.resolvedAddress,
 
     txHash:
       tx.hash,

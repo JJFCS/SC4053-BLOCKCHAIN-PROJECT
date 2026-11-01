@@ -4,7 +4,7 @@
 
 Reviewed frontend: `feature/frontend-wallet`, revision
 `7217ac7cd96be3813ba372c75f2bf3f8e042e9c2`.
-Contract target: `cb1f3c4b5bbc04326804089d30991dc69c6a2f60` plus its handoff ABI.
+Contract target: `cb1f3c4b5bbc04326804089d30991dc69c6a2f60` plus its compiled ABI.
 These findings refer to those snapshots. Recheck any newer teammate version.
 
 ## Reproduction and status

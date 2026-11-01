@@ -67,8 +67,7 @@ export function DomainStatusCard({
       return
     }
 
-    let expired =
-      false
+    let lastRefresh = 0
 
     const updateTimer =
       () => {
@@ -84,10 +83,9 @@ export function DomainStatusCard({
 
         if (
           remaining <= 0 &&
-          !expired
+          Date.now() - lastRefresh >= 5000
         ) {
-          expired =
-            true
+          lastRefresh = Date.now()
 
           onPhaseExpired?.()
         }

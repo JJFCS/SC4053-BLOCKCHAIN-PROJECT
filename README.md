@@ -74,10 +74,14 @@ The contract does not start an auction automatically. Connect the wallet and
 choose **Start round** in the app. Each round has a 120-second commit phase and
 a 120-second reveal phase. The fixed commitment deposit is 0.1 ETH, the maximum
 bid is 0.1 ETH, and a commitment not validly revealed incurs a 0.001 ETH
-penalty. Download the bid backup after committing; its salt is needed to reveal.
-After the reveal deadline, finalize the domain, settle the deposit, and withdraw
-any credited refund. The domain owner can change its resolution address. The
-payment form sends ETH to the address resolved by the contract.
+penalty. Selecting **Commit bid** downloads a reveal backup before the webpage
+confirmation and MetaMask request. Keep it until reveal completes; the salt and
+exact bid are required. Canceling the webpage confirmation leaves a prepared
+local record but submits no deposit. After a reload, reconnect the site to the
+wallet if needed; saved records remain visible. After the reveal deadline,
+finalize the domain, settle the deposit and withdraw any credited refund. The
+owner can update resolution. To pay a name, review the full resolved recipient,
+amount and network before confirming the checked contract transaction.
 
 ## Sepolia deployment
 

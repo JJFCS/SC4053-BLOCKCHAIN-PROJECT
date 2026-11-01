@@ -60,6 +60,7 @@ import {
         return
       }
   
+      let lastRefresh = 0
       const update =
         () => {
           setTimeLeft(
@@ -67,6 +68,10 @@ import {
               round.phaseEndsAt
             )
           )
+          if (Date.now() >= round.phaseEndsAt! && Date.now() - lastRefresh >= 5000) {
+            lastRefresh = Date.now()
+            onRefresh()
+          }
         }
   
       update()
@@ -84,6 +89,7 @@ import {
       }
     }, [
       round?.phaseEndsAt,
+      onRefresh,
     ])
   
     /*

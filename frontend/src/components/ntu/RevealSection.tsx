@@ -123,6 +123,7 @@ export function RevealSection({
                     settled={
                       !!c.settled
                     }
+                    submissionStatus={c.commitmentId ? "confirmed" : c.txHash ? "submitted" : "prepared"}
                     valid={
                       c.valid
                     }
@@ -221,7 +222,8 @@ export function RevealSection({
                       className="mt-4 h-10 w-full"
                       disabled={
                         !inReveal ||
-                        !correctWallet
+                        !correctWallet ||
+                        (!c.txHash && !c.commitmentId)
                       }
                       loading={
                         revealingHash ===
@@ -235,6 +237,8 @@ export function RevealSection({
                         ? "Connect wallet to reveal"
                         : !correctWallet
                           ? "Switch to original wallet"
+                          : !c.txHash && !c.commitmentId
+                            ? "Not submitted; commit during a round"
                           : inReveal
                             ? "Reveal bid"
                             : "Available in reveal phase"}
@@ -258,14 +262,24 @@ export function RevealSection({
 function CommitmentBadge({
   revealed,
   settled,
+  submissionStatus,
   valid,
   ready,
 }: {
   revealed: boolean
   settled: boolean
+  submissionStatus: "prepared" | "submitted" | "confirmed"
   valid?: boolean
   ready: boolean
 }) {
+  if (submissionStatus === "prepared") {
+    return <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs text-amber-800">Prepared, not submitted</span>
+  }
+
+  if (submissionStatus === "submitted") {
+    return <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs text-blue-800">Submitted, checking chain</span>
+  }
+
   if (settled) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs text-emerald-700">

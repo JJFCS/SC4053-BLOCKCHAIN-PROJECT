@@ -3,11 +3,13 @@ import { shortenHex } from "./handlers"
 
 export function Navbar({
   account,
+  networkLabel,
   connecting,
   onConnect,
   onDisconnect,
 }: {
   account: string | null
+  networkLabel: string
   connecting: boolean
   onConnect: () => void
   onDisconnect: () => void
@@ -27,7 +29,7 @@ export function Navbar({
         <div className="flex items-center gap-3">
           <span className="hidden items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1 text-xs text-zinc-600 sm:inline-flex">
             <span className="size-1.5 rounded-full bg-[#0047AB]" aria-hidden="true" />
-            Sepolia
+            {networkLabel}
           </span>
           {account ? (
             <button

@@ -1,238 +1,75 @@
-# AI Audit Report — Decentralized .ntu Domain Registrar
+# AI Audit Report: .ntu Domain Registrar
 
-Status: working report of the supplied revisions and completed checks.
-Final frontend fixes, remaining browser checks and group history must be incorporated
-before treating this as the final submission report. Automated results are scoped
-to recorded commands; later manual observations are labeled separately. Expected
-future results are not presented as completed work.
-
-Contract base: `cb1f3c4b5bbc04326804089d30991dc69c6a2f60`.
-Reviewed integration base: `16decbda349a26e0a8bd44eb4e216b6edd2e4b70`.
-Historical frontend: `7217ac7cd96be3813ba372c75f2bf3f8e042e9c2`.
-Review date: 27 October 2026, Singapore time.
+Review through 1 November 2026 (Singapore time). Contract base `cb1f3c4`, frontend revision `b753e49`, registrar-validation revision `67f8874`. The latest frontend corrections were reviewed as changes on top of that revision; the commit containing the corrections and this report identifies the integrated version. Automated tests, supplied terminal output and manual browser observations are distinguished below.
 
 ## 1. Initial Specification & System Scope
 
-The starting requirements supplied to this workflow came from Option 3 in the
-course brief: a .ntu registrar using hidden commitments and a reveal auction,
-highest valid bid ownership, forward address resolution, a browser interface,
-and ETH payments using registered names. The brief also raises non-reveal
-penalties, domain leakage and accelerated auction phases.
+The team selected Option 3: a `.ntu` registrar in which users search for a name, submit a hidden bid with a deposit, reveal it within a deadline, and register the name to the highest valid bidder. A registered name resolves to an Ethereum address and can be used to send ETH through a wallet-connected web application. Short auction phases and a non-reveal penalty are within scope.
 
-Detailed round lifecycle, fixed deposit/penalty values, reservation rules,
-checked payments, recovery schema and acceptance criteria were developed in the
-assisted specification process. The complete v0.5 specification is therefore a
-working engineering artifact; this report does not claim it was written before
-AI use. The team should incorporate any actual earlier scope/registration record
-when finalizing the account of its pre-tool intentions.
+`docs/SPEC.md` expands this into 120-second commit and reveal windows, a 0.1 ETH deposit, a 0.001 ETH penalty, one commitment per wallet per round, earlier-commit tie breaking, independent later rounds, pull-based refunds, owner-controlled resolution, checked payment forwarding and versioned local bid backups. These are choices in the AI-assisted working specification. No separate record of every requirement *before* AI use was available, so this report does not claim otherwise. Expiry, renewal, transfers, resale and reverse resolution were excluded or optional.
 
-Baseline scope excludes expiry, renewal, resale, ownership transfer and subdomains.
-Reverse resolution is optional. The system separates domain ownership from its
-current resolution address. On-chain state determines deadlines, reservations,
-ownership and credit; browser state supports input, wallet operations and recovery.
+The contract controls deadlines, bids, ownership and funds. The frontend prepares transactions and stores reveal preimages locally; the ABI and configured chain/address join the layers.
 
 ## 2. Development Methodology & AI Tooling Infrastructure
 
-The work spans contract implementation, frontend integration, independent
-validation, deployment and documentation. Final contribution details should be
-checked against the team's actual work.
+The repository has Solidity/Hardhat 3 contracts and tests, a React/Vite frontend with ethers v6 and MetaMask, a compiled ABI, deployment and validation scripts, and the specification. Contract implementation progressed on main; frontend work was on `feature/frontend-wallet`; integration, independent validation, deployment and documentation were on `feature/registrar-validation`. Git history establishes code revisions but does not establish every assistant, model, prompt or human edit used in earlier contract/frontend generation.
 
-The independent validation used ChatGPT/Codex to inspect the supplied code, follow the repository's
-Hardhat skills, prepare scripts/tests/docs, execute validation in an isolated
-Linux environment, and interpret the output. The original archives were retained.
-New work was prepared in a separate copy and exported as a reviewable patch.
+ChatGPT/Codex assisted the independent validation: comparing revisions against the specification and ABI, constructing tests and frontend corrections, executing checks in a separate copy, and drafting reviewable code and documentation patches. A team member applied the code patch in a Windows checkout, ran tests and observed browser failures and fixes. Earlier A/B tool identities and exact prompt transcripts were not retained in the reviewed materials, so they are not invented here.
 
-Infrastructure consists of:
-
-- `docs/SPEC.md`, the compiler-generated ABI and the contract interface guide.
-- Repository `hardhat` and `hardhat-toolbox-mocha-ethers` skills for the actual
-  Hardhat 3 API, test layers and build-before-typecheck workflow.
-- `scripts/validate.mjs` for ordered build, ABI export, typecheck and tests with
-  captured outputs and exit codes.
-- Deployment, verification and local transaction scripts, with source/ABI/code
-  bindings and actual transaction records.
-- An archived-handler audit harness which connects the unchanged historical
-  frontend module to a real simulated EVM through an EIP-1193 bridge.
-
-The repository records source and tests, but it does not establish every tool
-or model used during earlier development.
+The infrastructure includes `scripts/validate.mjs` (build, ABI export, typecheck and tests), local and Sepolia deployment/verification scripts, an HTTP local smoke scenario, a historical frontend reproduction harness, and `test/FrontendCurrentFlow.ts` for the corrected handler. The compiler ABI and `docs/CONTRACT_INTERFACE.md` make frontend bindings checkable. Source revisions and earlier output are listed in `SOURCE_REVISIONS.md` and `VALIDATION.md`.
 
 ## 3. Specification Engineering & Prompt Logs
 
-The formal specification defines contract state transitions, deadline boundaries,
-accounting, canonical function inputs, browser recovery and acceptance criteria.
-This gives code generation and subsequent review a shared set of observable rules.
+`docs/SPEC.md` gives method signatures, exact commitment encoding, state transitions, accounting, recovery schema and 29 acceptance checks. Review context included the brief, specification, source revisions, ABI, package/config files, existing tests and failing outputs. These are **technical summaries of recorded request/iteration chains**, not verbatim personal chat or an exhaustive transcript:
 
-The technical context for validation included the project brief, v0.5
-specification, source revisions, package/config files, existing tests, and the
-compiled ABI and interface guide.
+| Iteration | Context and technical request | Result and next check |
+| --- | --- | --- |
+| Interface/deployment | Compare registrar source and compiler ABI with the spec; make local and testnet deployment independently verifiable. | Added ABI export, deployment/verification and evidence binding; checked local HTTP and Sepolia outputs against actual chain, code and treasury. |
+| Frontend revision review | Reproduce handler/contract mismatches in the older captured revision, then recheck against the newer frontend. | Historical short-label, round-zero, reservation, owner/recipient and direct-payment errors were reproduced; several were already corrected in the newer revision. |
+| Bid recovery | Browser import lost on-chain IDs and commit times. Reconcile imported records with chain state and preserve exact amounts. | Import repair restored #1/#2. Later work added scoped storage, digest checks and preapproval backup preparation; #7 exact-wei import and five negative variants were observed. |
+| Network/payment | Diagnose `BAD_DATA` when the site wallet used Sepolia with a local contract address; require recipient/amount/network review before payment. | Added expected-chain/code checks and two-step preview. Visible wrong-chain warning, blocked search/write actions, declined payment and successful fresh payment were observed; automated stale-recipient rejection passed. |
+| Regression | Test the current handler with a rejected approval, exact integer bid, stale address and subsequent fresh payment. | `FrontendCurrentFlow.ts` passed in the 180-test run; remaining browser paths are listed separately. |
 
-Validation proceeded in iterations: establish source revisions, run original
-checks, add deployment/integration tools, reproduce frontend failures, review
-dependency advisories, and rerun affected checks after compatible dependency
-changes. Raw results are stored independently of the narrative.
+Earlier A/B generation prompts and model context were not available. This table records representative technical iterations of the reviewed work without fabricating their exact wording.
 
 ## 4. AI-Generated Architecture
 
-The reviewed backend is a single DomainRegistrar contract. It stores explicit
-round schedules, wallet commitments, per-round domain auctions, domain ownership
-and resolution, withdrawal credits, and aggregate liabilities. Commitments bind
-chain, registrar, round, wallet, canonical label, exact integer bid and salt.
+The reviewed system has one `DomainRegistrar` contract and no application backend. It records round schedules, bidder commitments, name auctions per round, ownership and resolution, withdrawal credits and liabilities. A commitment hashes the chain, registrar, round, bidder, canonical label, integer bid and random salt with standard ABI encoding. Commit exposes the round, digest and fixed deposit; reveal verifies the preimage and ranks valid bids. Highest bid wins, with earlier on-chain commit order breaking ties. After the deadline anyone can finalize. Bidders settle and withdraw their own credits; the treasury withdraws only credited proceeds.
 
-Valid reveals reserve names for the original round. Highest bid wins, with
-earlier on-chain commitment order breaking ties. Finalization assigns ownership
-and credits the winning price. Settlement produces bidder credit; withdrawal
-pays it using the shared reentrancy guard. Domain payment checks the expected
-recipient at execution and forwards only new transaction value.
-
-The current frontend uses React/Vite and ethers BrowserProvider. Commit 66b12a2
-adds explicit-round, settlement and resolution screens; merge 16decbd includes
-main's current contracts. Its ABI bindings correct several earlier assumptions.
-Recovery, expected-chain enforcement and recipient-confirmation gaps remain.
-The compiled ABI contains 48 entries and is documented in `CONTRACT_INTERFACE.md`.
+The React frontend uses MetaMask through ethers to show state, prepare a salt and backup, and request transactions. `sendToDomain` checks the displayed expected recipient against current resolution in the same transaction and forwards only `msg.value`; ownership remains separate from the receiving address. The reviewed ABI has 48 entries. The original integrated frontend lacked complete backup context, expected-chain checks and a separate payment confirmation; later corrections address these gaps.
 
 ## 5. Problems Discovered & Vulnerability Analysis
 
-Detailed observations, impacts, inferred causes, proposed fixes and required
-verification are in `FRONTEND_FINDINGS.md`.
+No new reproducible Solidity logic vulnerability was identified. Existing adversarial tests cover reentrancy, authorization, deadline boundaries, refunds and escrow. That does not prove the absence of other vulnerabilities. The causes below are **inferences from source and revisions**, not claims to know a model's internal reasoning or missing prompts.
 
-| ID | Finding | Evidence/status |
-| --- | --- | --- |
-| DOC-01 | Main's specification was a heading; compiled ABI/interface guide absent. | Resolved by adding the specification, ABI and interface guide; ABI equality checked. |
-| DEPLOY-01 | Only the Counter example was deployable through the supplied module. | Registrar deployment/verification added, exercised over local HTTP RPC, then deployed and verified on Sepolia. |
-| FE-01 | Current build fails on unused icon/orphan component imports. | Repaired and production build verified; before/after logs retained. |
-| FE-02 | Historical short-name mismatch. | Fixed in 16decbd; current handler check passed. |
-| FE-03 | Historical round-0 read failure. | Fixed in 16decbd; current handler check passed. |
-| FE-04 | Historical pending-name status failure. | Fixed in 16decbd; current handler check passed. |
-| FE-05 | Historical owner/recipient confusion. | Fixed in 16decbd; current handler check passed. |
-| FE-06 | Historical direct transfer; current confirmation gap. | Checked contract path fixed/verified; explicit UI preview/confirmation still open. |
-| FE-07 | Backup recovery and pre-commit persistence are incomplete. | Same-wallet import of two settled bids initially lost commitment IDs and commit times; a local repair restored them in the browser. Pre-commit and negative-path checks remain open. |
-| FE-08 | Historical missing lifecycle screens/operations. | Added in 66b12a2/16decbd; complete browser acceptance pending. |
-| FE-09 | Expected network is not enforced. | Local contract reads on the wrong wallet chain produced `BAD_DATA`; open. |
-| FE-10 | Invalid name input is silently changed. | Source-confirmed; open. |
-| DEP-01 | Dependency audit reports affected tooling packages. | Compatible update reduced entries from 22 to 13; Zod-related finding remains open. |
+| Issue | Likely cause; why it matters | Change | Evidence and limit |
+| --- | --- | --- | --- |
+| FE-07 backup recovery | Import replaced metadata instead of reconciling on-chain IDs; generic storage and saving only after receipt left a paid bid vulnerable to lost reveal data and the non-reveal penalty. | Restore IDs/times from chain; scope records by chain/registrar/wallet/round, validate preimages and save/download before wallet approval. | #1/#2 IDs and times restored; #7 exact `30000000000000001` wei round trip and negative imports observed. Automated preapproval/rejection test passed. Round #7 prepared record remained after browser reload with no on-chain ID; reload during a pending wallet transaction remains untested. |
+| FE-09 network | No configured-chain comparison led to opaque `BAD_DATA` on a wrong chain and an incorrect fixed navbar label. | Check chain and deployed code before reads/writes; show actual chain and warning. | Original failure reproduced. With site wallet 11155111 and configured registrar 31337, the revised page displayed the exact chain mismatch, Search was blocked, and write controls were unavailable. The navbar reflected the wallet's Sepolia network; with the wallet on 31337 it showed Hardhat Local. No wrong-chain transaction was attempted. |
+| FE-06 payment preview | Checked contract call existed, but UI sent without a separate full recipient/amount/network review. A user could approve without confirming the destination. | Separate preview and confirmation; bind checked recipient and discard failed/stale preview. | Browser preview showed full address, 0.001 ETH and chain 31337 before MetaMask; rejection was handled. Current-handler race test changed resolution and rejected the stale payment without paying either address, then succeeded after fresh preview. The revised UI also completed a 0.001 ETH browser payment to `local-test-2.ntu`; the live browser race remains unobserved. |
+| FE-10 label input | Input filtering hid invalid pasted characters and could display a different name from the one entered. | Preserve text and reject invalid syntax at validation. | Initially `_` could not remain in the field; after correction `bad_name` remained visible and Search rejected it. No wrong-name transaction was observed. |
+| FE-01 build | Unused icon and orphan component with unresolved imports survived without a successful production build. | Remove unused files/imports and build. | Before/after build logs and later Windows build passed; bundle size warning is nonfatal. |
+| DEP-01 toolchain | Transitive development packages had advisories; a forced major migration would change Hardhat compatibility. | Compatible update followed by full validation; retain remaining finding. | Earlier audit reduced 22 entries to 13 high; a 1 November rerun reports 13 high and 5 moderate affected entries in `evidence/audit-summary-2026-11-01.json`. High entries propagate from Zod through Hardhat tools; moderate entries include Mocha/glob/minimatch and TypeChain dependants. No on-chain exploit was demonstrated. |
+| DEPLOY-02 cross-checkout verification | The verifier normalizes source bytes for its source hash but compares the deployment's creation data with a freshly compiled artifact. A compiler metadata difference from Windows CRLF versus LF inputs was reported and is plausible from this comparison. | Preserve or replay original compiler input/artifact before claiming exact cross-checkout creation-bytecode reproduction; alternatively state the current verification scope. No cross-platform fix was applied here. | Windows verified the Sepolia deployment; a separate LF checkout verified a newly deployed *local* registrar. Exact LF re-verification of the original Sepolia creation data remains unconfirmed. |
 
-No additional reproducible contract-logic vulnerability was identified in this
-pass. This does not establish the absence of vulnerabilities. Existing adversarial
-tests were rerun, and the validation added interface, evidence-binding and
-complete-flow checks.
-
-For the major frontend findings, the likely causes are version drift or missing
-integration context. These are inferences from the reviewed versions and source;
-no specific cause is attributed to a model without direct evidence.
-Pending fixes are not described as successful remediation. DEP-01 is a developer
-dependency finding and is not presented as a demonstrated on-chain funds exploit.
+FE-02 through FE-05 were historical errors in `7217ac7` already corrected by the later frontend. Version-specific reproductions and limits are in `FRONTEND_FINDINGS.md` and `history/frontend-7217ac7.md`.
 
 ## 6. Validation Process & Testing Strategy
 
-Validation was executed in an isolated Linux environment with Node 24.22.1 and
-npm 11.9.0. The repository specifies Node 26. An earlier Windows run showed
-38 tests on an earlier state; those results are not substituted for current tests.
+An isolated Linux run recorded 176 baseline named tests and 179 after interface/deployment/flow tests. With the current-handler integration test added, the Windows terminal reported **180 passing (153 Solidity, 27 Mocha)**; the frontend TypeScript/Vite production build passed. Five named tests are Counter examples. A separate clean local clone of `67f8874` plus reviewable patches installed both lockfiles offline, passed 180 tests and frontend build, deployed/verified a new local registrar, ran the local smoke scenario and served Vite's HTML with matching chain/address settings. This checks the README command path in a new directory, not another teammate's browser walkthrough of a final commit.
 
-The unchanged supplied contract suite passed 176 named tests: 153 Solidity and
-23 Mocha. After the integration additions, build, ABI export, typecheck and 179 tests passed:
-153 Solidity and 26 Mocha. Five tests are Counter examples; 174 are registrar
-tests. All existing Solidity/contract logic was preserved.
+The registrar was deployed to Sepolia chain 11155111 at `0x9dbe733cDB4F8BBB6a960177c2c3bB7E005819F9`, transaction `0xb07b99bb1b8e63c1610ab77b9103f1665045a837eb70cd684ca3157915d55408`. The separate verification command reported `verified: true` and round zero. This is deployment evidence, not Sepolia browser acceptance.
 
-The three additional integration tests check exact compiler/published ABI equality and canonical
-fields, verify deployment-evidence bindings and reject wrong chain/ABI/code
-records, and drive an entire auction/refund/payment flow through the published
-ABI. They complement the existing unit, adversarial and fuzz tests.
+Local smoke and manual browser checks covered competing bids, later-round interaction, missing reveal, winner/loser/zero refunds, withdrawals, address updates, checked payment and exact-wei backup import. Browser rounds #3/#4 showed higher bid and earlier-commit tie outcomes; round #5 had two independent names and exact `69999999999999999` wei refund for #7. Parsed #7/#8 commit transactions had two arguments, 68 calldata bytes, fixed deposits and no label/bid/salt in calldata or events. Round #6 #9 was revealed and remained visible after page reload before wallet reconnection, then was reported finalized and settled. A prior 0.01 ETH name payment reached its recipient. The revised two-step preview was tested with both a canceled request and a successful 0.001 ETH browser payment. Round #7 canceled before MetaMask and remained Prepared, not submitted after reload, with older records intact. A site-wallet switch to Sepolia while the configured registrar remained on local chain 31337 displayed a visible wrong-network warning and blocked search and write actions. `BROWSER_ACCEPTANCE.md` distinguishes each observed and open case.
 
-An actual local HTTP deployment was verified by chain, code, creation receipt,
-compiled creation data, constructor treasury, source and ABI. A local scenario
-then exercised competing bids, older-round finalization after a newer round had
-started, winning/losing/non-reveal settlement, all withdrawals, address updates,
-stale-recipient rejection and successful checked payment while preserving a
-newer deposit. Actual local hashes and output are in `docs/evidence`.
-
-On 27 October 2026 at 09:56 UTC, `DomainRegistrar` was deployed from a Windows
-checkout to Ethereum Sepolia (chain ID `11155111`). The contract source matches
-the reviewed main revision `cb1f3c4`. The deployed contract
-is `0x9dbe733cDB4F8BBB6a960177c2c3bB7E005819F9`, with public treasury and
-deployer address `0x20Dc8080A1e86d2e2E80FbF9E6FAe548073B0c6F`. The
-deployment transaction is
-`0xb07b99bb1b8e63c1610ab77b9103f1665045a837eb70cd684ca3157915d55408`.
-The deployment script reported successful verification, and the separate
-`verify-deployment.ts` run reported `verified: true` and `currentRoundId: 0`.
-These are the Windows command outputs supplied by the team; the public deployment
-record was written locally to `contracts/deployments/11155111.json` and should be
-included with the final project evidence. Browser acceptance has not followed
-from this deployment alone.
-
-The historical frontend build failed. Five behavioural issues were reproduced by
-executing its real handler module against the EVM. This is not React/MetaMask
-acceptance: browser storage, user confirmation, live wallet changes and reload
-flows still require the browser checklist. The fixture remains historical and
-deliberately continues to reproduce the old errors.
-
-The complete branch bundle later revealed commit 66b12a2 followed by merge 16decbd.
-All eleven contract tips are included in main, and contract files in 16decbd are
-identical to main. Current handler execution verified four old fixes and the
-checked payment path. Its production build initially failed on four errors;
-removing an unused icon import and an unreferenced component produced a passing
-build. Browser acceptance is partial. The scope/status of each of the 29
-specification criteria is recorded in REQUIREMENTS_COVERAGE.md.
-
-A later manual browser walkthrough combined frontend-wallet `b753e49` with
-registrar-validation `c2f8bcc` on local chain 31337. An unrevealed commitment
-returned 0.099 ETH, and a 0.06 ETH winning bid returned 0.04 ETH after reveal
-and finalization. Both credits were withdrawn. The owner changed the name's
-resolution address, then a 0.01 ETH name payment reached that recipient. The
-local RPC balance check reported recipient 10000.01 ETH and registrar 0.061 ETH
-after the payment. Same-wallet import of both settled records restored their
-on-chain IDs and commit times after a local repair. These browser observations
-are described in `BROWSER_ACCEPTANCE.md`; screenshots and full browser receipts
-have not yet been attached. Two-wallet browser competition, failed imports,
-pre-commit recovery and stale-recipient confirmation remain unverified there.
-
-Dependency changes were followed by the complete validation suite, frontend
-reproductions and local deployment scenario. Current audit outputs distinguish
-before/update/after states. Sepolia deployment and script verification are now
-recorded separately from the Linux test runs. No Slither run or formal
-verification is claimed. `VALIDATION.md` identifies the evidence and boundaries.
+The current-handler test verifies preapproval callback, wallet rejection with no on-chain commit, wrong-chain blocking, stale-recipient rejection and fresh successful payment. It does not substitute for MetaMask UI testing. Archived handler probes deliberately reproduce obsolete errors. No Slither/formal verification or complete browser receipts/screenshots are claimed.
 
 ## 7. Improvements & Refinements
 
-- Integrated the agreed specification and compiler interface into the review copy.
-- Added an explicit localhost network and actual registrar deployment entry points.
-- Added validation of treasury/network before deployment and a requirement for
-  persistent HTTP networks when writing a frontend deployment record.
-- Bound deployment records to source, compiled creation transaction, runtime code,
-  ABI, chain and constructor; generated current frontend deployment settings.
-- Added automated local lifecycle evidence and repeatable validation commands.
-- Added three focused interface/deployment integration tests and five reproducible
-  frontend findings with source/version evidence.
-- Recovered on-chain commitment IDs and state during backup import after a local
-  browser check exposed missing IDs; re-import of settled records passed.
-- Updated compatible dependency versions without forcing a Hardhat major downgrade,
-  then reran tests. The remaining advisory is explicitly recorded.
-
-No Solidity logic change was made in this pass. The production build repair removes an unused icon and unreferenced component.
-The existing frontend commit fixes several older findings, verified separately
-against the current handler module; these fixes are attributed to that commit.
-Remaining UI remediation and browser regressions are still pending.
+The validation branch added specification, compiled ABI/interface record, reproducible deployment and verification, a local transaction scenario, integration tests and README setup. A public Sepolia deployment record is committed in `contracts/deployments/11155111.json`. Browser findings led to import reconciliation, exact-wei/context validation, preapproval backup, chain/code guard, preserved invalid input, two-step payment preview and periodic round refresh. The team member found the lost IDs during browser import, requested an AI-assisted correction and retested the restored #1/#2 records. Later #7 and #9 checks extended recovery evidence. Original Solidity logic was not changed by this validation work.
 
 ## 8. Lessons Learned
 
-The recorded work shows why success at one layer does not establish application
-completion: 176 contract tests passed while the separate frontend failed to build
-and retained assumptions about names, rounds, ownership and payments that were
-inconsistent with the current contract.
+A passing contract suite did not establish that wallet and browser flows were correct. Comparing specification, compiled ABI, revisions and chain observations exposed stale bindings and separated obsolete bugs from current ones. AI assistance accelerated inspection, test construction and fixes, but browser observation found missing import metadata, wrong-network behaviour and a payment confirmation gap. Future dApp work should verify recovery before paid commitments, bind frontend actions to the actual chain and destination, test the full wallet path and keep command outputs beside claims.
 
-A compiler-generated ABI and formal specification made those inconsistencies
-easier to inspect and reproduce. Versioned archives prevented the older contract
-inside the frontend ZIP from being mistaken for the current implementation.
-Local deployment records made environment assumptions explicit instead of
-treating an example address as a shared deployment.
-
-AI assistance accelerated inspection, test construction and documentation, but
-the evidence came from actual command execution and chain assertions. Generated
-suggestions still needed context, reproducible checks and clear ownership of
-integration work. Dependency reports also required interpretation: compatible
-updates removed some findings, while a forced fix proposed breaking changes.
-
-Before submission, incorporate final frontend changes and remaining browser results, public Sepolia
-deployment evidence, and final fresh setup and demo evidence. Identify any
-development history that remains unavailable and keep unresolved limitations
-visible in the submitted report.
+Before submission, publish the integrated branch, check the application from that commit, retain the documented developer-dependency advisory risk unless a compatible fix is verified, and prepare the complete code ZIP and <=10-minute architecture/demo video. A browser reload during a pending wallet receipt and a live browser stale-recipient race remain unobserved. Exact earlier A/B AI tools and prompt history are unavailable and are not invented here.
