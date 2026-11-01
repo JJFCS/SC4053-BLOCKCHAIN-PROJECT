@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from "react"
+import { useEffect, useState, type FormEvent } from "react"
 import { Gavel, RefreshCw } from "lucide-react"
 import { Button, Card, Field, Notice } from "./primitives"
-import { generateSalt, shortenHex, type DomainInfo } from "./handlers"
+import { generateSalt, phaseRemainingMs, shortenHex, type DomainInfo } from "./handlers"
 
 export function BidForm({
   domain,
@@ -16,8 +16,16 @@ export function BidForm({
 }) {
   const [amount, setAmount] = useState("")
   const [salt, setSalt] = useState("")
+  const [now, setNow] = useState(Date.now())
 
-  const canBid = domain && (domain.status === "available" || domain.status === "commit")
+  useEffect(() => {
+    if (!domain?.phaseEndsAt) return
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [domain?.phaseEndsAt])
+
+  const canBid = domain?.status === "commit" &&
+    phaseRemainingMs(domain.phaseEndsAt, domain.chainClock, now) > 0
   const amountValid = Number(amount) >= 0.01
 
   const handleSubmit = (e: FormEvent) => {
@@ -78,7 +86,15 @@ export function BidForm({
 
         {domain && !canBid && (
           <Notice tone="warn">
-            Bidding is closed for this name ({domain.status === "reveal" ? "reveal phase" : "registered"}).
+            {domain.status === "commit"
+              ? "The commit window has elapsed. Refresh the round before bidding."
+              : domain.status === "registered"
+                ? "Bidding is closed for this registered name."
+                : domain.status === "reveal"
+                  ? "Bidding is closed during the reveal phase."
+                  : domain.status === "ended"
+                    ? "This name is reserved until its auction is finalized."
+                  : "Start a new auction round before bidding on this name."}
           </Notice>
         )}
 

@@ -24,6 +24,21 @@ async function currentHandlers(address: string, chainId: string) {
 }
 
 describe("current frontend handler integration", function () {
+  it("waits for a chain block before treating an estimated deadline as closed", async function () {
+    const handlers = await currentHandlers("0x5FbDB2315678afecb367f032d93F642f64180aa3", "31337");
+    const clock = { chainTimestampMs: 1793576034000, capturedAtMs: 1793575786000 };
+    const deadline = 1793576039000;
+    const laterWallTime = clock.capturedAtMs + 10000;
+
+    assert.equal(handlers.phaseEstimateExpired(deadline, clock, laterWallTime), true);
+    assert.equal(handlers.phaseRemainingMs(deadline, clock, laterWallTime), 1);
+    assert.equal(handlers.formatTimeLeft(deadline, clock, laterWallTime), "Awaiting chain block");
+
+    const endedClock = { ...clock, chainTimestampMs: deadline };
+    assert.equal(handlers.phaseRemainingMs(deadline, endedClock, laterWallTime), 0);
+    assert.equal(handlers.formatTimeLeft(deadline, endedClock, laterWallTime), "0s");
+  });
+
   it("saves the exact preimage before approval, blocks the wrong chain, and rechecks a confirmed payment", async function () {
     const [owner, treasury, payer, recipient, replacement] = await ethers.getSigners();
     const registrar = await ethers.deployContract("DomainRegistrar", [treasury.address]);

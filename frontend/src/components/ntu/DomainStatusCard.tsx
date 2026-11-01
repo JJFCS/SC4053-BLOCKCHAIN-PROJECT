@@ -9,11 +9,13 @@ import {
 
 import {
   useEffect,
+  useRef,
   useState,
 } from "react"
 
 import {
   formatTimeLeft,
+  phaseEstimateExpired,
   shortenHex,
   type DomainInfo,
 } from "./handlers"
@@ -42,6 +44,7 @@ export function DomainStatusCard({
     timeLeft,
     setTimeLeft,
   ] = useState("—")
+  const lastRefresh = useRef(0)
 
   /*
     ========================================================
@@ -67,25 +70,20 @@ export function DomainStatusCard({
       return
     }
 
-    let lastRefresh = 0
-
     const updateTimer =
       () => {
-        const remaining =
-          domain.phaseEndsAt! -
-          Date.now()
-
         setTimeLeft(
           formatTimeLeft(
-            domain.phaseEndsAt
+            domain.phaseEndsAt,
+            domain.chainClock
           )
         )
 
         if (
-          remaining <= 0 &&
-          Date.now() - lastRefresh >= 5000
+          phaseEstimateExpired(domain.phaseEndsAt, domain.chainClock) &&
+          Date.now() - lastRefresh.current >= 5000
         ) {
-          lastRefresh = Date.now()
+          lastRefresh.current = Date.now()
 
           onPhaseExpired?.()
         }
@@ -106,6 +104,8 @@ export function DomainStatusCard({
     }
   }, [
     domain?.phaseEndsAt,
+    domain?.chainClock?.chainTimestampMs,
+    domain?.chainClock?.capturedAtMs,
     onPhaseExpired,
   ])
 

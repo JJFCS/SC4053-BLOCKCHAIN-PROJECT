@@ -161,6 +161,11 @@ export type RoundPhase =
   | "reveal"
   | "ended"
 
+export interface ChainClock {
+  chainTimestampMs: number
+  capturedAtMs: number
+}
+
 export interface DomainInfo {
   name: string
 
@@ -169,6 +174,8 @@ export interface DomainInfo {
   roundId?: string
 
   phaseEndsAt?: number
+
+  chainClock?: ChainClock
 
   owner?: string
 
@@ -286,6 +293,8 @@ export interface RoundState {
   phase: RoundPhase
 
   phaseEndsAt?: number
+
+  chainClock?: ChainClock
 
   pendingDomainCount: string
 
@@ -671,6 +680,39 @@ async function getReadContract() {
   )
 }
 
+const clockStorageKey = "ntu-chain-clock-v1"
+let observedClock: { blockKey: string; clock: ChainClock } | null = null
+
+async function readChainClock(): Promise<ChainClock> {
+  const block = await getProvider().getBlock("latest")
+  if (!block) throw new Error("Could not read the latest chain timestamp.")
+
+  const blockKey = `${getExpectedChainId()}:${block.hash ?? block.number}`
+  if (observedClock?.blockKey === blockKey &&
+      observedClock.clock.chainTimestampMs === block.timestamp * 1000) return observedClock.clock
+
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(clockStorageKey) ?? "null")
+    if (saved?.blockKey === blockKey &&
+        saved.clock?.chainTimestampMs === block.timestamp * 1000 &&
+        Number.isFinite(saved.clock.capturedAtMs)) {
+      observedClock = saved
+      return saved.clock
+    }
+  } catch {
+    // Private browsing or damaged session data must not block contract reads.
+  }
+
+  const clock = { chainTimestampMs: block.timestamp * 1000, capturedAtMs: Date.now() }
+  observedClock = { blockKey, clock }
+  try {
+    sessionStorage.setItem(clockStorageKey, JSON.stringify(observedClock))
+  } catch {
+    // The in-memory clock still works if session storage is unavailable.
+  }
+  return clock
+}
+
 async function getWriteContract() {
   const provider =
     getProvider()
@@ -784,6 +826,8 @@ Promise<RoundState | null> {
       roundId
     )
 
+  const chainClock = await readChainClock()
+
   const phase =
     phaseFromNumber(
       Number(
@@ -836,6 +880,8 @@ Promise<RoundState | null> {
     phase,
 
     phaseEndsAt,
+
+    chainClock,
 
     pendingDomainCount:
       round.pendingDomainCount.toString(),
@@ -1035,6 +1081,8 @@ export async function checkDomain(
   const contract =
     await getReadContract()
 
+  const chainClock = await readChainClock()
+
   /*
     --------------------------------------------------------
     REGISTERED?
@@ -1137,6 +1185,8 @@ export async function checkDomain(
           Number(
             round.revealEnd
           ) * 1000,
+
+        chainClock,
 
         highestBid:
           auction.highestBidWei >
@@ -1265,6 +1315,8 @@ export async function checkDomain(
         Number(
           round.commitEnd
         ) * 1000,
+
+      chainClock,
     }
   }
 
@@ -1285,6 +1337,8 @@ export async function checkDomain(
         Number(
           round.revealEnd
         ) * 1000,
+
+      chainClock,
     }
   }
 
@@ -2294,8 +2348,39 @@ export function shortenHex(
   )}`
 }
 
+export function phaseRemainingMs(
+  timestamp?: number,
+  clock?: ChainClock,
+  now = Date.now()
+): number {
+  if (!timestamp) return 0
+  const estimatedChainTime = clock
+    ? clock.chainTimestampMs + Math.max(0, now - clock.capturedAtMs)
+    : now
+  // Wall time is only an estimate between blocks. If the last observed block
+  // still has time left, keep the action available for the contract to decide.
+  if (clock && clock.chainTimestampMs < timestamp) {
+    return Math.max(1, timestamp - estimatedChainTime)
+  }
+  return Math.max(0, timestamp - estimatedChainTime)
+}
+
+export function phaseEstimateExpired(
+  timestamp?: number,
+  clock?: ChainClock,
+  now = Date.now()
+): boolean {
+  if (!timestamp) return false
+  const estimatedChainTime = clock
+    ? clock.chainTimestampMs + Math.max(0, now - clock.capturedAtMs)
+    : now
+  return estimatedChainTime >= timestamp
+}
+
 export function formatTimeLeft(
-  timestamp?: number
+  timestamp?: number,
+  clock?: ChainClock,
+  now = Date.now()
 ): string {
   if (
     !timestamp
@@ -2303,15 +2388,15 @@ export function formatTimeLeft(
     return "—"
   }
 
-  const difference =
-    Math.max(
-      0,
-      timestamp -
-        Date.now()
-    )
+  if (clock && clock.chainTimestampMs < timestamp &&
+      phaseEstimateExpired(timestamp, clock, now)) {
+    return "Awaiting chain block"
+  }
+
+  const difference = phaseRemainingMs(timestamp, clock, now)
 
   const totalSeconds =
-    Math.floor(
+    Math.ceil(
       difference /
         1000
     )

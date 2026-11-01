@@ -6,6 +6,8 @@ import {
   Upload,
 } from "lucide-react"
 
+import { useEffect, useState } from "react"
+
 import {
   Button,
   Card,
@@ -13,6 +15,7 @@ import {
 } from "./primitives"
 
 import {
+  phaseRemainingMs,
   shortenHex,
   type Commitment,
   type DomainInfo,
@@ -35,6 +38,13 @@ export function RevealSection({
   onDownloadBackup: () => void
   onImportBackup: (file: File) => void
 }) {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    if (!domain?.phaseEndsAt) return
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [domain?.phaseEndsAt])
+
   return (
     <Card
       title="Reveal bids"
@@ -103,7 +113,8 @@ export function RevealSection({
 
             const inReveal =
               domain?.name === c.name &&
-              domain.status === "reveal"
+              domain.status === "reveal" &&
+              phaseRemainingMs(domain.phaseEndsAt, domain.chainClock, now) > 0
 
             return (
               <li
@@ -242,6 +253,9 @@ export function RevealSection({
                           ? "Switch to original wallet"
                           : !c.txHash && !c.commitmentId
                             ? "Not submitted; commit during a round"
+                          : domain?.name === c.name && domain.status === "reveal" &&
+                            phaseRemainingMs(domain.phaseEndsAt, domain.chainClock, now) === 0
+                            ? "Reveal window elapsed; refresh"
                           : inReveal
                             ? "Reveal bid"
                             : "Available in reveal phase"}

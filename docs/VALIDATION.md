@@ -167,15 +167,34 @@ reported that transaction failed; the original UI stayed Submitted, and a
 local receipt-reconciliation correction subsequently displayed Commit failed.
 The revert reason was not established. A successful delayed receipt after
 reload and a live stale-recipient race remain unobserved.
+The next local round confirmed a bid as commitment #1 after refresh, but the
+displayed Reveal countdown was 7m54s despite a 120-second window after RPC
+time advances. The reveal attempt failed with a phase error; after refresh the
+round showed Ended. The unrevealed deposit was settled and withdrawn. A
+chain-timestamp countdown and expired-action guard passed the frontend build
+and a focused elapsed-time calculation. During browser retest, the next Commit
+countdown started at 2m and decreased after Refresh. After the estimate reached
+Reveal 0s and one block was mined, an RPC read still reported `phase: 2` and
+five seconds before `revealEnd` (block `1793576034`, deadline `1793576039`,
+computer `1793575786`). The extrapolated wall time had closed the UI phase
+before a block closed the contract phase. A follow-up keeps the action open
+while the last block is before the deadline and shows an awaiting-block label;
+with the follow-up applied, the browser displayed **Awaiting chain block**.
+After `evm_increaseTime` with `[6]` and `evm_mine`, Refresh displayed
+**Round ended**. No bid was submitted in this round; the observation verifies
+the phase display, not a transaction at the exact deadline.
 
 ## Current frontend regression command, 2 November
 
-`npm run check:frontend` now runs the existing `test/FrontendCurrentFlow.ts`
-against the current frontend handler. A focused run passed with one Mocha test
-covering preapproval recovery, wallet rejection, the network guard and a
-stale-recipient payment followed by fresh preview. The older fixture remains
-available as `npm run check:frontend-archived`. This command change does not
-add a new browser observation or alter the earlier 180-test total.
+`npm run check:frontend` runs `test/FrontendCurrentFlow.ts` against the
+current frontend handler. The original focused test covered preapproval
+recovery, wallet rejection, the network guard and a stale-recipient payment
+followed by fresh preview. A second test checks the case where wall-time
+extrapolation reaches a deadline but the latest block remains five seconds
+before it. The follow-up `npm run check:frontend` passed **2 tests** and the
+frontend production build passed. The older fixture remains available as
+`npm run check:frontend-archived`. The full suite was not rerun after the
+second frontend test; the earlier 181-test result is for the prior revision.
 
 ## Sepolia compiler replay, 2 November
 

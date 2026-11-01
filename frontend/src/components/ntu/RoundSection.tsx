@@ -6,6 +6,7 @@ import {
   
   import {
     useEffect,
+    useRef,
     useState,
   } from "react"
   
@@ -17,6 +18,7 @@ import {
   
   import {
     formatTimeLeft,
+    phaseEstimateExpired,
     type RoundState,
   } from "./handlers"
   
@@ -44,6 +46,7 @@ import {
       timeLeft,
       setTimeLeft,
     ] = useState("—")
+    const lastRefresh = useRef(0)
   
     /*
       Local countdown.
@@ -60,16 +63,16 @@ import {
         return
       }
   
-      let lastRefresh = 0
       const update =
         () => {
           setTimeLeft(
             formatTimeLeft(
-              round.phaseEndsAt
+              round.phaseEndsAt,
+              round.chainClock
             )
           )
-          if (Date.now() >= round.phaseEndsAt! && Date.now() - lastRefresh >= 5000) {
-            lastRefresh = Date.now()
+          if (phaseEstimateExpired(round.phaseEndsAt, round.chainClock) && Date.now() - lastRefresh.current >= 5000) {
+            lastRefresh.current = Date.now()
             onRefresh()
           }
         }
@@ -89,6 +92,8 @@ import {
       }
     }, [
       round?.phaseEndsAt,
+      round?.chainClock?.chainTimestampMs,
+      round?.chainClock?.capturedAtMs,
       onRefresh,
     ])
   

@@ -63,6 +63,7 @@ import {
   getRegistrarAddress,
   getWithdrawalCredit,
   previewPayment,
+  phaseRemainingMs,
   reconcileSubmittedCommitment,
   revealBid,
   sendPayment,
@@ -1007,6 +1008,14 @@ export default function NtuApp() {
         persistCommitment(recovered)
         if (verified.revealed || verified.settled) {
           throw new Error("This commitment has already been revealed or settled.")
+        }
+
+        const currentDomain = await checkDomain(commitment.name)
+        setDomain(currentDomain)
+        if (currentDomain.status !== "reveal" ||
+            phaseRemainingMs(currentDomain.phaseEndsAt, currentDomain.chainClock) === 0) {
+          await refreshRound()
+          throw new Error("The reveal window has elapsed; this bid can no longer be revealed.")
         }
 
         const result =

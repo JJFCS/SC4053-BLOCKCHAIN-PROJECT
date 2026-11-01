@@ -15,6 +15,7 @@ actual retests. Older reproductions remain in `history/frontend-7217ac7.md`.
 | FE-08 | Auction lifecycle screens exercised through seven local rounds. |
 | FE-09 | Wrong-chain `BAD_DATA` and mislabeled navbar reproduced. Corrected local navbar and visible chain-mismatch warning observed; search and write actions were blocked with wallet on 11155111 and registrar configured for 31337. |
 | FE-10 | Input originally filtered unsupported characters; after correction `bad_name` remained visible and Search rejected it. No wrong-name transaction was observed. |
+| FE-11 | After local RPC time advances, the UI showed 7m54s in a 120-second reveal window and offered Reveal; the contract rejected the attempt. The first chain-clock correction then showed Reveal at 0s while the latest block still had five seconds left. With the follow-up applied, the page showed Awaiting chain block and then Round ended after a block crossed the deadline. |
 
 ## FE-01: build gate
 
@@ -94,10 +95,34 @@ the field and Search said `Use lowercase letters, numbers and hyphens only.`
 There was no on-chain wrong-name transaction. Other case/suffix/overlong cases
 have not all been recorded manually.
 
+## FE-11: local phase clock
+
+The round #3 browser run confirmed a 0.02 ETH commitment with ID #1, which
+survived refresh. Following local time manipulation, the UI showed Reveal with
+7m54s remaining even though the configured reveal period is 120 seconds.
+The reveal call failed with `Bids can only be revealed during the reveal phase`;
+after refresh, the round showed Ended. No valid reveal or reservation was
+created, and the unrevealed deposit was settled and withdrawn. The contract
+deadline check held; the frontend compared a chain deadline with the computer's
+wall clock. The first correction anchored countdowns to the latest block
+timestamp and rechecked the reveal window before requesting a transaction.
+During its browser retest, Commit began at 2m and decreased across Refresh,
+but Reveal showed 0s after one `evm_mine` while the latest block still had
+five seconds to its deadline. The block timestamp was 248 seconds ahead of
+the computer clock. The wall-time estimate reached zero between blocks even
+though `getRound` still returned Reveal. The follow-up treats the latest block
+and contract phase as authoritative for offering actions, displays an
+awaiting-block state after the estimate expires, and periodically refreshes.
+A transaction can still cross a deadline between the final read and inclusion.
+With the follow-up applied, the browser displayed Awaiting chain block and,
+after a six-second local time advance and a mined block, Round ended. No bid
+was submitted in that round; action acceptance at this boundary was not
+tested manually.
+
 ## Test provenance
 
 `npm run check:frontend` now executes `contracts/test/FrontendCurrentFlow.ts`
-against the current handler and simulated EVM. Its focused rerun passed on
+against the current handler and simulated EVM. Its two focused tests passed on
 2 November. The earlier `16decbd` fixture remains available under
 `npm run check:frontend-archived` for historical comparison. The browser
 observations and limits are in `BROWSER_ACCEPTANCE.md`.
