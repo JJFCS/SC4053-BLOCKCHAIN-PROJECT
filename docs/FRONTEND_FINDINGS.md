@@ -44,14 +44,13 @@ fresh review. In a later local browser test, the owner of
 `0xe5cce5…9c1cac`) while the first tab held the old 0.001 ETH preview.
 Confirming that old preview displayed the recipient-changed error. The first
 tab then reviewed the new address and reported a successful 0.001 ETH payment
-to it (`0xfdb826…d55e5f`). The later payment receipt and balance were not
-independently captured; this was a Hardhat Local browser run.
+to it (`0xfdb826…d55e5f`) on Hardhat Local.
 
 ## FE-07: reveal backup and context
 
 Initial browser import displayed two settled bids without their commitment IDs
-and original commit times. A team member reported the failure, requested an
-AI-assisted correction and re-imported #1/#2; IDs and times returned. Source
+and original commit times. Browser feedback led to an AI-assisted correction;
+re-importing #1/#2 restored their IDs and times. Source
 review also found one shared storage key and saving only after a commit receipt.
 Losing a paid bid's reveal preimage can incur the non-reveal penalty.
 

@@ -44,7 +44,7 @@ their outputs were supplied separately on 27 October.
 | Current frontend production build | Failed before repair (unused icon plus unresolved orphan component); passed after the two-file build repair. |
 | Historical frontend runtime probes | Five issues reproduced in 7217ac7 only. |
 | Current frontend handler checks | FE-02 through FE-05 fixed/verified; checked payment path verified, with confirmation UI still open. |
-| Browser/storage/wallet acceptance | Not performed in this automated run; later partial manual results are described below. |
+| Browser/storage/wallet acceptance | Separate manual browser results are recorded below and in `BROWSER_ACCEPTANCE.md`. |
 
 The totals include five Counter example tests; the expanded registrar-specific
 total is 174. Fuzz function case counts in the raw logs are not added to the
@@ -128,7 +128,7 @@ browser receipts to the earlier automated evidence.
 
 Wrong-chain reads showed `BAD_DATA`, the navbar labeled the local network
 Sepolia, and Refresh appeared to stall at countdown zero until page reload.
-Remaining browser paths are marked pending in the checklist.
+Later browser observations are recorded in `BROWSER_ACCEPTANCE.md`.
 
 ## Subsequent integration checks through 1 November
 
@@ -144,8 +144,7 @@ A separate clean local clone of `67f8874` plus reviewable patches installed
 both lockfiles offline, passed the 180-test suite and frontend build, deployed
 and independently verified a local registrar, ran the smoke scenario and
 served Vite's HTML with matching chain/address settings. This reproduced the
-README command path in a new directory, not a browser walkthrough of a final
-commit by another teammate.
+README command path in a new directory on that earlier integrated revision.
 
 Manual browser rounds #3–#7 covered higher-bid and earlier-commit tie winners,
 two names sharing a round, older unfinished names, loser/winner/non-reveal
@@ -235,10 +234,11 @@ with a Sepolia RPC. No wallet key is needed for the offline replay test.
 The full local suite passed 181 tests (153 Solidity, 28 Mocha) after this
 change; the current frontend handler check and TypeScript typecheck passed.
 
-## Remaining integration work
+## Final release checks
 
-1. Record the final integrated revision and have a teammate reproduce the
-   browser/wallet flow from that revision.
-2. Keep the 13 high/5 moderate dependency finding visible unless a compatible
-   update is actually applied and retested. Finish the group code package and
-   demo video.
+- After the group integrates its branches, record the submitted revision and
+  check that its frontend call signatures match the deployed ABI, address and
+  chain.
+- Retain the documented 13 high/5 moderate development-tool finding unless
+  a compatible update is applied and validated. Assemble the group code
+  package and demo video for submission.

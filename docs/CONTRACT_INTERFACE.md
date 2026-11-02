@@ -6,7 +6,7 @@ The ABI below comes directly from the Solidity 0.8.34 compiler artifact.
 
 ## Start here
 
-- Frontend integration: use contracts/abi/DomainRegistrar.json with the deployed address and chain ID, and use the canonical round-based operations below.
+- Frontend integration: treat `contracts/abi/DomainRegistrar.json` as the compiler-exported interface. Compare the frontend's selected call signatures in `handlers.ts` with it, configure the deployed address and chain ID, and use the canonical round-based operations below.
 - Deployment: deploy DomainRegistrar with one nonzero treasuryAddress constructor argument. Publish the real address, chain ID, deployment transaction, constructor argument, source revision, and matching ABI to the team.
 - Contract maintenance: support integration questions and address observed contract failures against this interface.
 
@@ -272,10 +272,14 @@ node scripts/export-registrar-abi.mjs
 
 The exporter writes a bare ABI array to abi/DomainRegistrar.json. It does not include bytecode, addresses, or private configuration. It exports the existing compiler artifact, so build after changing the contract before exporting. Publish the regenerated ABI and matching deployed address together.
 
-## Integration acceptance still required
+## Integration evidence
 
-Browser acceptance should demonstrate the full wallet, normalization, backup/export/import, old-round status, finalization, settlement, withdrawal, address update, and stale-recipient payment flows in a browser.
+The local browser walkthrough exercised wallet connection, bids and reveals,
+backup export/import, older rounds, finalization, settlement, withdrawal,
+resolution updates, and a payment after a changed-recipient preview was
+rejected. `BROWSER_ACCEPTANCE.md` records what was observed; contract and
+current-handler tests cover additional boundary and authorization cases.
 
-Deployment validation should deploy the actual DomainRegistrar, record its constructor argument/address/chain, verify a clean setup, run independent security/integration checks, and retain deployment/transaction evidence.
-
-The original main snapshot contained the Vite starter and Counter deployment example. The integration base now includes the frontend and registrar deployment additions. Remaining report, browser acceptance and demo requirements are tracked in REQUIREMENTS_COVERAGE.md.
+The Sepolia deployment record, local setup results and reproducibility checks
+are in `VALIDATION.md`. `REQUIREMENTS_COVERAGE.md` maps the specification
+checks to evidence and identifies the remaining group deliverables.

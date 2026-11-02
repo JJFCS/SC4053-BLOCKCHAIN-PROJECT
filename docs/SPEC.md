@@ -361,23 +361,28 @@ Automate contract checks, including exact time boundaries, old/new round interac
 
 Provide deployment scripts, an example environment configuration without secrets, and a README covering installation, compilation, testing, deployment, wallet setup, and frontend startup.
 
-Record chain IDs, deployment addresses, and compatible contract ABIs in the frontend configuration. A local redeployment must update the frontend's contract address and ABI.
+Record chain IDs, deployment addresses, and compatible contract interfaces in the frontend configuration. A local redeployment must update the frontend's contract address; changes to contract methods also require matching frontend signatures and an updated exported ABI.
 
 The application must run from a fresh checkout using the documented prerequisites and commands. Include known limitations and the configured auction timings, deposits, and penalties.
 
-### Project completion checklist
+### Submission requirements
 
-The specification defines intended work. Complete the following implementation, validation, and submission items before treating the project as finished:
+This section defines what the group must submit; it is not a live progress
+tracker. Actual check results and deliverable status are in
+`REQUIREMENTS_COVERAGE.md`, `BROWSER_ACCEPTANCE.md` and `VALIDATION.md`.
 
-- [ ] Implement the baseline contract and frontend features in sections 2-10.
-- [ ] Run the acceptance checks in section 11 against the actual code, record results, and fix observed failures. Record any unresolved limitations.
-- [ ] Verify that a fresh installation can deploy the contracts and run the frontend using the README.
-- [ ] Record design decisions, version history, issues, fixes, test commands, and validation evidence throughout development.
-- [ ] Complete the separate audit report using the actual development history and test evidence.
-- [ ] Package the complete codebase as `GroupName.zip`, including source code, required assets, dependency manifests and lockfiles, deployment and test scripts, example configuration, README, specification, report, and relevant evidence. Exclude private keys, seed phrases, live reveal backups, and credentials.
-- [ ] Produce `GroupName.mp4`, or a hosted video URL, with a duration of at most 10 minutes. Start with an architecture/design introduction, then demonstrate the deployed application through the required user flows. Include competing bids, reveal, finalization, resolution, and an ETH payment by name.
-- [ ] Submit the codebase and video through their respective submission portals. The posted deadline is 8 November 2026, 11:59 pm, Singapore time.
-- [ ] Complete the mandatory individual peer evaluation using the course instructions.
+- Package the complete codebase as `GroupName.zip`, including source code,
+  required assets, dependency manifests and lockfiles, deployment and test
+  scripts, example configuration, README, specification, audit report and
+  relevant evidence. Exclude private keys, seed phrases, live reveal backups
+  and credentials.
+- Produce `GroupName.mp4`, or a hosted video URL, at most 10 minutes long.
+  Introduce the architecture and design, then demonstrate the deployed
+  application, including competing bids, reveal, finalization, resolution and
+  an ETH payment by name.
+- Submit code and video through the respective course portals by the posted
+  deadline: 8 November 2026, 11:59 pm Singapore time. Each member must
+  complete the mandatory individual peer evaluation.
 
 Local deployment and demonstration are permitted by the posted submission instructions. The domain-registrar description also refers to an Ethereum testnet. Document the actual network used; provide testnet configuration when deploying there. Record real deployment addresses and transaction references rather than example values as evidence.
 

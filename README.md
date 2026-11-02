@@ -113,9 +113,9 @@ interfaces. `contracts/deployments/` holds generated deployment records.
 - `docs/SPEC.md`: behaviour and acceptance criteria.
 - `docs/CONTRACT_INTERFACE.md`: contract methods and events.
 - `docs/VALIDATION.md`, `docs/BROWSER_ACCEPTANCE.md`, and
-  `docs/REQUIREMENTS_COVERAGE.md`: observed checks and remaining coverage.
-- `docs/FRONTEND_FINDINGS.md`: known frontend integration limitations.
+  `docs/REQUIREMENTS_COVERAGE.md`: observed validation and coverage.
+- `docs/FRONTEND_FINDINGS.md`: frontend findings, corrections and results.
 - `docs/AI_AUDIT_REPORT.md`: development and audit account.
 
-Browser checks and outstanding issues are tracked in those documents. A passing
-contract suite does not by itself establish that every wallet and UI path works.
+The documents identify which conclusions come from contract tests and which
+come from local browser observations.

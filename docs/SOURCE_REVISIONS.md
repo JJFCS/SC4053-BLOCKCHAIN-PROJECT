@@ -29,7 +29,8 @@ The integration patch is based on `16decbd` so the frontend history is retained.
 Contract logic still comes from `cb1f3c4`; the deployment/validation additions do
 not alter the original Solidity files.
 
-The older `7217ac7` review is retained as historical evidence. Current findings
-and handler checks use `16decbd`. See `REQUIREMENTS_COVERAGE.md` for all 29
-specification checks and the remaining course deliverables. This inventory
+The older `7217ac7` review is retained as historical evidence. This snapshot's
+handler checks use `16decbd`; later checks use the current frontend handler.
+See `REQUIREMENTS_COVERAGE.md` for all 29 specification checks and current
+course deliverable status. This inventory
 accounts for the captured revisions; it is not a guarantee of zero defects.

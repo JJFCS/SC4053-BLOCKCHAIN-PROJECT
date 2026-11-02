@@ -1,11 +1,13 @@
-> Historical review of 7217ac7. Current status is in ../FRONTEND_FINDINGS.md.
+> Historical review of `7217ac7`. For current results, see
+> [`FRONTEND_FINDINGS.md`](../FRONTEND_FINDINGS.md) and
+> [`BROWSER_ACCEPTANCE.md`](../BROWSER_ACCEPTANCE.md).
 
 # Frontend integration findings
 
 Reviewed frontend: `feature/frontend-wallet`, revision
 `7217ac7cd96be3813ba372c75f2bf3f8e042e9c2`.
 Contract target: `cb1f3c4b5bbc04326804089d30991dc69c6a2f60` plus its compiled ABI.
-These findings refer to those snapshots. Recheck any newer teammate version.
+These findings refer only to those snapshots, not the later integrated app.
 
 ## Reproduction and status
 
@@ -15,9 +17,9 @@ BrowserProvider to an EIP-1193 bridge backed by an actual simulated EVM. It does
 not execute React, MetaMask, or browser storage. The fixture's exact byte hash is
 recorded in `docs/evidence/frontend-reproductions.json`.
 
-All frontend findings below remain open in the reviewed 7217ac7 snapshot. The five successful
-reproductions demonstrate failures, not successful fixes. Person B owns the
-frontend changes; C reruns acceptance and retains evidence afterward.
+The findings below describe the reviewed `7217ac7` snapshot. Five successful
+reproductions demonstrate its original failures; later corrections and retests
+are recorded in the current findings and browser acceptance documents.
 
 ## FE-01 — Frontend production build fails
 
@@ -135,10 +137,8 @@ frontend changes; C reruns acceptance and retains evidence afterward.
   for complete current state, not on the assumption that every old read must fail.
 - **Verification needed:** the complete browser checklist below, plus a clean build.
 
-## Acceptance after B's changes
+## Later validation
 
-Run `docs/BROWSER_ACCEPTANCE.md`, capture the tested code revision and actual
-results, and add targeted regression checks for each fixed finding. Keep the
-historical reproduction fixture unchanged as evidence of the reviewed input.
-It deliberately continues to reproduce the original issues until a separate
-fixed-frontend acceptance harness is introduced.
+The archived reproduction fixture intentionally retains these original
+failures. The current handler regression check and local browser results are
+recorded in `../FRONTEND_FINDINGS.md` and `../BROWSER_ACCEPTANCE.md`.
