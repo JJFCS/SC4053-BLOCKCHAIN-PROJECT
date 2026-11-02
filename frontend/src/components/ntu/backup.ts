@@ -4,69 +4,38 @@ import {
     ZeroAddress,
     formatEther,
     isAddress,
+    parseEther,
   } from "ethers"
   
   import {
     computeCommitmentHash,
+    getRegistrarAddress,
     validateLabel,
     type Commitment,
   } from "./handlers"
   
-  declare global {
-    interface Window {
-      ethereum?: any
-    }
-  }
-  
-  const REGISTRAR_ADDRESS =
-    import.meta.env.VITE_REGISTRAR_ADDRESS as string | undefined
   
   const UINT256_MAX =
     (1n << 256n) - 1n
   
-  /*
-    Only the read methods needed to verify
-    a backup against the deployed registrar.
-  */
   const BACKUP_ABI = [
     "function COMMIT_DEPOSIT() view returns (uint256)",
     "function getCommitmentId(uint256 roundId, address bidder) view returns (uint256)",
     "function getCommitment(uint256 commitmentId) view returns (tuple(address bidder, bytes32 digest, uint256 roundId, uint256 deposit, bool revealed, bool valid, bytes32 labelHash, uint256 bidWei, bool settled))",
   ]
   
-  /*
-    ============================================================
-    BACKUP FORMAT REQUIRED BY THE SPEC
-    ============================================================
-  */
-  
   export interface RevealBackupV1 {
     schemaVersion: 1
-  
     chainId: string
-  
     registrarAddress: string
-  
     bidderAddress: string
-  
     roundId: string
-  
     label: string
-  
     bidWei: string
-  
     salt: string
-  
     commitment: string
-  
     commitTxHash: string | null
   }
-  
-  /*
-    ============================================================
-    BASIC HELPERS
-    ============================================================
-  */
   
   function requireEthereum() {
     if (!window.ethereum) {
@@ -78,21 +47,12 @@ import {
     return window.ethereum
   }
   
-  function requireRegistrarAddress(): string {
-    if (!REGISTRAR_ADDRESS) {
-      throw new Error(
-        "Registrar contract has not been deployed/configured yet."
-      )
-    }
-  
-    return REGISTRAR_ADDRESS
-  }
-  
   function isBytes32(
     value: unknown
   ): value is string {
     return (
-      typeof value === "string" &&
+      typeof value ===
+        "string" &&
       /^0x[0-9a-fA-F]{64}$/.test(
         value
       )
@@ -104,8 +64,11 @@ import {
     field: string
   ): bigint {
     if (
-      typeof value !== "string" ||
-      !/^[0-9]+$/.test(value)
+      typeof value !==
+        "string" ||
+      !/^[0-9]+$/.test(
+        value
+      )
     ) {
       throw new Error(
         `${field} must be a base-10 integer string.`
@@ -131,39 +94,47 @@ import {
     ============================================================
     EXPORT
     ============================================================
+  
+    IMPORTANT:
+  
+    The backup uses the ORIGINAL context stored when the
+    commitment was prepared.
+  
+    It does not ask MetaMask what chain is selected now.
   */
   
   export async function createRevealBackup(
-    commitment: Commitment
+    commitment:
+      Commitment
   ): Promise<RevealBackupV1> {
-    const provider =
-      new BrowserProvider(
-        requireEthereum()
+    if (
+      !commitment.chainId
+    ) {
+      throw new Error(
+        "This saved bid does not contain its original chain ID and cannot be safely exported."
       )
-  
-    const network =
-      await provider.getNetwork()
-  
-    /*
-      We use bidWei directly when available.
-  
-      For older records created before this field
-      existed, convert the ETH string exactly once.
-    */
-    let bidWei: string
+    }
   
     if (
-      commitment.bidWei
+      !commitment.registrarAddress
     ) {
+      throw new Error(
+        "This saved bid does not contain its original registrar address and cannot be safely exported."
+      )
+    }
+  
+    let bidWei:
+      string
+  
+    if (commitment.bidWei) {
       bidWei =
         commitment.bidWei
     } else {
       /*
-        This fallback exists only for old local records.
-        New commitments should always store bidWei.
+        Legacy compatibility only.
+  
+        New records always store bidWei directly.
       */
-      const { parseEther } =
-        await import("ethers")
   
       bidWei =
         parseEther(
@@ -172,13 +143,14 @@ import {
     }
   
     return {
-      schemaVersion: 1,
+      schemaVersion:
+        1,
   
       chainId:
-        network.chainId.toString(),
+        commitment.chainId,
   
       registrarAddress:
-        requireRegistrarAddress(),
+        commitment.registrarAddress,
   
       bidderAddress:
         commitment.bidder,
@@ -205,7 +177,7 @@ import {
   
   /*
     ============================================================
-    JSON SHAPE VALIDATION
+    STRUCTURAL VALIDATION
     ============================================================
   */
   
@@ -213,7 +185,8 @@ import {
     raw: unknown
   ): RevealBackupV1 {
     if (
-      typeof raw !== "object" ||
+      typeof raw !==
+        "object" ||
       raw === null
     ) {
       throw new Error(
@@ -239,9 +212,7 @@ import {
         "chainId"
       )
   
-    if (
-      chainId <= 0n
-    ) {
+    if (chainId <= 0n) {
       throw new Error(
         "chainId must be greater than zero."
       )
@@ -253,9 +224,7 @@ import {
         "roundId"
       )
   
-    if (
-      roundId <= 0n
-    ) {
+    if (roundId <= 0n) {
       throw new Error(
         "roundId must be greater than zero."
       )
@@ -267,9 +236,7 @@ import {
         "bidWei"
       )
   
-    if (
-      bidWei <= 0n
-    ) {
+    if (bidWei <= 0n) {
       throw new Error(
         "bidWei must be greater than zero."
       )
@@ -358,18 +325,31 @@ import {
       )
     }
   
-    return backup as RevealBackupV1
+    return backup as
+      RevealBackupV1
   }
   
   /*
     ============================================================
-    CONTEXT + HASH VERIFICATION
+    IMPORT VERIFICATION
     ============================================================
+  
+    A backup can exist before an on-chain transaction exists.
+  
+    Therefore:
+    - structure/context/hash MUST validate
+    - if an on-chain commitment exists, it MUST match
+    - if no on-chain commitment exists and commitTxHash is null,
+      the prepared recovery record is still valid
+  
+    revealBid() performs the final on-chain check before reveal.
   */
   
   export async function verifyRevealBackup(
-    backup: RevealBackupV1,
-    connectedAccount: string
+    backup:
+      RevealBackupV1,
+    connectedAccount:
+      string
   ): Promise<void> {
     const provider =
       new BrowserProvider(
@@ -378,13 +358,6 @@ import {
   
     const network =
       await provider.getNetwork()
-  
-    const configuredRegistrar =
-      requireRegistrarAddress()
-  
-    /*
-      1. Chain check
-    */
   
     if (
       network.chainId.toString() !==
@@ -395,22 +368,14 @@ import {
       )
     }
   
-    /*
-      2. Contract check
-    */
-  
     if (
-      configuredRegistrar.toLowerCase() !==
+      getRegistrarAddress().toLowerCase() !==
       backup.registrarAddress.toLowerCase()
     ) {
       throw new Error(
         "This backup belongs to a different registrar deployment."
       )
     }
-  
-    /*
-      3. Wallet check
-    */
   
     if (
       connectedAccount.toLowerCase() !==
@@ -431,12 +396,16 @@ import {
         backup.bidWei
       )
   
-    /*
-      4. Recompute commitment locally
-    */
-  
     const recomputed =
       await computeCommitmentHash({
+        chainId:
+          BigInt(
+            backup.chainId
+          ),
+  
+        registrarAddress:
+          backup.registrarAddress,
+  
         roundId,
   
         bidder:
@@ -460,13 +429,9 @@ import {
       )
     }
   
-    /*
-      5. Check bid against the configured deposit limit.
-    */
-  
     const contract =
       new Contract(
-        configuredRegistrar,
+        backup.registrarAddress,
         BACKUP_ABI,
         provider
       )
@@ -476,18 +441,12 @@ import {
       await contract.COMMIT_DEPOSIT()
   
     if (
-      bidWei >
-      deposit
+      bidWei > deposit
     ) {
       throw new Error(
         "Backup bid exceeds the registrar's maximum allowed bid."
       )
     }
-  
-    /*
-      6. Verify the actual commitment stored on-chain
-         for this wallet and round.
-    */
   
     const commitmentId:
       bigint =
@@ -496,13 +455,32 @@ import {
         backup.bidderAddress
       )
   
+    /*
+      No transaction was ever submitted.
+  
+      This is valid recovery data from a rejected or
+      not-yet-approved commit.
+    */
+  
     if (
-      commitmentId ===
-      0n
+      commitmentId === 0n &&
+      backup.commitTxHash === null
     ) {
-      throw new Error(
-        "No on-chain commitment exists for this wallet and round."
-      )
+      return
+    }
+  
+    /*
+      A transaction hash exists but nothing is recorded
+      on-chain yet.
+  
+      It may still be pending, but don't pretend it is
+      confirmed.
+    */
+  
+    if (
+      commitmentId === 0n
+    ) {
+      return
     }
   
     const stored =
@@ -522,14 +500,21 @@ import {
   
   /*
     ============================================================
-    CONVERT VERIFIED BACKUP BACK INTO UI RECORD
+    BACKUP → UI RECORD
     ============================================================
   */
   
   export function backupToCommitment(
-    backup: RevealBackupV1
+    backup:
+      RevealBackupV1
   ): Commitment {
     return {
+      chainId:
+        backup.chainId,
+  
+      registrarAddress:
+        backup.registrarAddress,
+  
       roundId:
         backup.roundId,
   
@@ -561,6 +546,11 @@ import {
   
       createdAt:
         Date.now(),
+  
+      submissionStatus:
+        backup.commitTxHash
+          ? "pending"
+          : "prepared",
   
       revealed:
         false,

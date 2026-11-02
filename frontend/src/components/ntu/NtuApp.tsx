@@ -4,29 +4,12 @@ import {
   useState,
 } from "react"
 
-import {
-  Navbar,
-} from "./Navbar"
-
-import {
-  RoundSection,
-} from "./RoundSection"
-
-import {
-  DomainSearch,
-} from "./DomainSearch"
-
-import {
-  DomainStatusCard,
-} from "./DomainStatusCard"
-
-import {
-  BidForm,
-} from "./BidForm"
-
-import {
-  RevealSection,
-} from "./RevealSection"
+import { Navbar } from "./Navbar"
+import { RoundSection } from "./RoundSection"
+import { DomainSearch } from "./DomainSearch"
+import { DomainStatusCard } from "./DomainStatusCard"
+import { BidForm } from "./BidForm"
+import { RevealSection } from "./RevealSection"
 
 import {
   SettlementSection,
@@ -34,13 +17,8 @@ import {
   type WithdrawalResult,
 } from "./SettlementSection"
 
-import {
-  ResolutionSection,
-} from "./ResolutionSection"
-
-import {
-  PaymentSection,
-} from "./PaymentSection"
+import { ResolutionSection } from "./ResolutionSection"
+import { PaymentSection } from "./PaymentSection"
 
 import {
   backupToCommitment,
@@ -51,23 +29,269 @@ import {
 
 import {
   checkDomain,
-  commitBid,
+  confirmBidCommitment,
+  confirmPayment,
   connectWallet,
   disconnectWallet,
   finalizeDomain,
   getCurrentRoundState,
   getFriendlyError,
+  getNetworkStatus,
   getWithdrawalCredit,
+  prepareBidCommitment,
+  previewPayment,
+  reconcileBidCommitment,
+  requestBidCommitment,
   revealBid,
-  sendPayment,
   setResolutionAddress,
   settleCommitment,
   startAuctionRound,
+  switchToConfiguredNetwork,
   withdrawCredit,
   type Commitment,
   type DomainInfo,
+  type NetworkStatus,
+  type PaymentPreview,
   type RoundState,
 } from "./handlers"
+
+/*
+  ============================================================
+  RECOVERY STORAGE
+  ============================================================
+
+  One record is namespaced by:
+
+  chain
+  + registrar
+  + bidder
+  + round
+*/
+
+const STORAGE_PREFIX =
+  "ntu-commitment"
+
+const LEGACY_STORAGE_KEY =
+  "ntu-commitments"
+
+function getCommitmentStorageKey(
+  commitment:
+    Commitment
+): string | null {
+  if (
+    !commitment.chainId ||
+    !commitment.registrarAddress
+  ) {
+    return null
+  }
+
+  return [
+    STORAGE_PREFIX,
+    commitment.chainId,
+    commitment.registrarAddress.toLowerCase(),
+    commitment.bidder.toLowerCase(),
+    commitment.roundId,
+  ].join(":")
+}
+
+function persistCommitment(
+  commitment:
+    Commitment
+) {
+  const key =
+    getCommitmentStorageKey(
+      commitment
+    )
+
+  if (!key) {
+    return
+  }
+
+  /*
+    localStorage is synchronous.
+
+    This is deliberately called BEFORE the MetaMask
+    transaction request.
+  */
+
+  localStorage.setItem(
+    key,
+    JSON.stringify(
+      commitment
+    )
+  )
+}
+
+function loadStoredCommitments():
+Commitment[] {
+  const records:
+    Commitment[] = []
+
+  /*
+    Load the new context-specific records.
+  */
+
+  for (
+    let index = 0;
+    index <
+    localStorage.length;
+    index += 1
+  ) {
+    const key =
+      localStorage.key(
+        index
+      )
+
+    if (
+      !key ||
+      !key.startsWith(
+        `${STORAGE_PREFIX}:`
+      )
+    ) {
+      continue
+    }
+
+    try {
+      const raw =
+        localStorage.getItem(
+          key
+        )
+
+      if (!raw) {
+        continue
+      }
+
+      const parsed =
+        JSON.parse(
+          raw
+        ) as Commitment
+
+      records.push(
+        parsed
+      )
+    } catch (error) {
+      console.error(
+        `Failed to load ${key}:`,
+        error
+      )
+    }
+  }
+
+  /*
+    Preserve legacy records.
+
+    We DO NOT invent missing chain or registrar context.
+  */
+
+  try {
+    const legacy =
+      localStorage.getItem(
+        LEGACY_STORAGE_KEY
+      )
+
+    if (legacy) {
+      const parsed =
+        JSON.parse(
+          legacy
+        )
+
+      if (
+        Array.isArray(
+          parsed
+        )
+      ) {
+        for (
+          const record of parsed
+        ) {
+          const duplicate =
+            records.some(
+              (existing) =>
+                existing.hash ===
+                record.hash
+            )
+
+          if (!duplicate) {
+            records.push(
+              record
+            )
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error(
+      "Failed to load legacy commitments:",
+      error
+    )
+  }
+
+  return records.sort(
+    (left, right) =>
+      (right.createdAt ?? 0) -
+      (left.createdAt ?? 0)
+  )
+}
+
+function sameCommitmentContext(
+  left:
+    Commitment,
+  right:
+    Commitment
+): boolean {
+  if (
+    left.chainId &&
+    right.chainId &&
+    left.registrarAddress &&
+    right.registrarAddress
+  ) {
+    return (
+      left.chainId ===
+        right.chainId &&
+      left.registrarAddress.toLowerCase() ===
+        right.registrarAddress.toLowerCase() &&
+      left.bidder.toLowerCase() ===
+        right.bidder.toLowerCase() &&
+      left.roundId ===
+        right.roundId
+    )
+  }
+
+  return (
+    left.hash ===
+    right.hash
+  )
+}
+
+function upsertCommitment(
+  records:
+    Commitment[],
+  incoming:
+    Commitment
+): Commitment[] {
+  const index =
+    records.findIndex(
+      (existing) =>
+        sameCommitmentContext(
+          existing,
+          incoming
+        )
+    )
+
+  if (index < 0) {
+    return [
+      incoming,
+      ...records,
+    ]
+  }
+
+  const next =
+    [...records]
+
+  next[index] =
+    incoming
+
+  return next
+}
 
 export default function NtuApp() {
   /*
@@ -80,15 +304,38 @@ export default function NtuApp() {
     account,
     setAccount,
   ] =
-    useState<
-      string | null
-    >(null)
+    useState<string | null>(
+      null
+    )
 
   const [
     connecting,
     setConnecting,
+  ] = useState(false)
+
+  /*
+    ========================================================
+    NETWORK
+    ========================================================
+  */
+
+  const [
+    networkStatus,
+    setNetworkStatus,
   ] =
-    useState(false)
+    useState<NetworkStatus | null>(
+      null
+    )
+
+  const [
+    loadingNetwork,
+    setLoadingNetwork,
+  ] = useState(false)
+
+  const [
+    switchingNetwork,
+    setSwitchingNetwork,
+  ] = useState(false)
 
   /*
     ========================================================
@@ -100,21 +347,19 @@ export default function NtuApp() {
     round,
     setRound,
   ] =
-    useState<
-      RoundState | null
-    >(null)
+    useState<RoundState | null>(
+      null
+    )
 
   const [
     loadingRound,
     setLoadingRound,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   const [
     startingRound,
     setStartingRound,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   /*
     ========================================================
@@ -126,31 +371,28 @@ export default function NtuApp() {
     domain,
     setDomain,
   ] =
-    useState<
-      DomainInfo | null
-    >(null)
+    useState<DomainInfo | null>(
+      null
+    )
 
   const [
     searching,
     setSearching,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   const [
     committing,
     setCommitting,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   const [
     finalizing,
     setFinalizing,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   /*
     ========================================================
-    SAVED COMMITMENTS / REVEAL RECOVERY
+    COMMITMENT / RECOVERY
     ========================================================
   */
 
@@ -158,64 +400,22 @@ export default function NtuApp() {
     commitments,
     setCommitments,
   ] =
-    useState<
-      Commitment[]
-    >(() => {
-      try {
-        const saved =
-          localStorage.getItem(
-            "ntu-commitments"
-          )
-
-        if (!saved) {
-          return []
-        }
-
-        const parsed =
-          JSON.parse(
-            saved
-          )
-
-        if (
-          !Array.isArray(
-            parsed
-          )
-        ) {
-          return []
-        }
-
-        /*
-          Older local records may not contain bidWei.
-
-          We keep them loaded so they are not silently
-          destroyed, but they will need migration before
-          they can be used for a real reveal.
-        */
-
-        return parsed
-      } catch (
-        error
-      ) {
-        console.error(
-          "Failed to load commitments:",
-          error
-        )
-
-        return []
-      }
-    })
+    useState<Commitment[]>(
+      () =>
+        loadStoredCommitments()
+    )
 
   const [
     revealingHash,
     setRevealingHash,
   ] =
-    useState<
-      string | null
-    >(null)
+    useState<string | null>(
+      null
+    )
 
   /*
     ========================================================
-    SETTLEMENT / WITHDRAWAL
+    SETTLEMENT
     ========================================================
   */
 
@@ -223,87 +423,206 @@ export default function NtuApp() {
     settlingHash,
     setSettlingHash,
   ] =
-    useState<
-      string | null
-    >(null)
+    useState<string | null>(
+      null
+    )
 
   const [
     withdrawalCreditEth,
     setWithdrawalCreditEth,
-  ] =
-    useState("0")
+  ] = useState("0")
 
   const [
     loadingCredit,
     setLoadingCredit,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   const [
     withdrawing,
     setWithdrawing,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   const [
     lastSettlement,
     setLastSettlement,
   ] =
-    useState<
-      SettlementResult | null
-    >(null)
+    useState<SettlementResult | null>(
+      null
+    )
 
   const [
     lastWithdrawal,
     setLastWithdrawal,
   ] =
-    useState<
-      WithdrawalResult | null
-    >(null)
+    useState<WithdrawalResult | null>(
+      null
+    )
 
   /*
     ========================================================
-    RESOLUTION ADDRESS
+    RESOLUTION
     ========================================================
   */
 
   const [
     updatingResolution,
     setUpdatingResolution,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   const [
     lastResolutionTxHash,
     setLastResolutionTxHash,
   ] =
-    useState<
-      string | null
-    >(null)
+    useState<string | null>(
+      null
+    )
 
   /*
     ========================================================
     PAYMENT
     ========================================================
   */
+    const [
+      previewingPayment,
+      setPreviewingPayment,
+    ] = useState(false)
+    
+    const [
+      paymentPreview,
+      setPaymentPreview,
+    ] =
+      useState<PaymentPreview | null>(
+        null
+      )
 
   const [
     sending,
     setSending,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   const [
     lastPayment,
     setLastPayment,
-  ] =
-    useState<{
-      name: string
-      amount: string
-      resolvedAddress: string
-      txHash: string
-    } | null>(null)
+  ] = useState<{
+    name: string
+    amount: string
+    resolvedAddress: string
+    txHash: string
+  } | null>(null)
 
+  /*
+    ========================================================
+    NETWORK REFRESH
+    ========================================================
+  */
+
+  const refreshNetworkStatus =
+    useCallback(
+      async () => {
+        setLoadingNetwork(
+          true
+        )
+
+        try {
+          const status =
+            await getNetworkStatus()
+
+          setNetworkStatus(
+            status
+          )
+
+          return status
+        } catch (error) {
+          console.error(
+            "Failed to read network:",
+            error
+          )
+
+          setNetworkStatus(
+            null
+          )
+
+          return null
+        } finally {
+          setLoadingNetwork(
+            false
+          )
+        }
+      },
+      []
+    )
+
+  /*
+    ========================================================
+    ROUND REFRESH
+    ========================================================
+  */
+
+  const refreshRound =
+    useCallback(
+      async () => {
+        setLoadingRound(
+          true
+        )
+
+        try {
+          const status =
+            await getNetworkStatus()
+
+          setNetworkStatus(
+            status
+          )
+
+          if (!status.ready) {
+            setRound(null)
+
+            return
+          }
+
+          const current =
+            await getCurrentRoundState()
+
+          setRound(
+            current
+          )
+        } catch (error) {
+          console.error(
+            "Failed to load round:",
+            error
+          )
+
+          setRound(null)
+        } finally {
+          setLoadingRound(
+            false
+          )
+        }
+      },
+      []
+    )
+
+  /*
+    ========================================================
+    INITIAL LOAD
+    ========================================================
+  */
+
+    useEffect(() => {
+      const timeoutId =
+        window.setTimeout(() => {
+          void refreshNetworkStatus()
+          void refreshRound()
+        }, 0)
+    
+      return () => {
+        window.clearTimeout(
+          timeoutId
+        )
+      }
+    }, [
+      refreshNetworkStatus,
+      refreshRound,
+    ])
   /*
     ========================================================
     METAMASK EVENTS
@@ -312,7 +631,7 @@ export default function NtuApp() {
 
   useEffect(() => {
     const ethereum =
-      window.ethereum as any
+      window.ethereum
 
     if (!ethereum) {
       return
@@ -327,19 +646,12 @@ export default function NtuApp() {
           accounts.length ===
           0
         ) {
-          setAccount(
-            null
-          )
+          setAccount(null)
         } else {
           setAccount(
             accounts[0]
           )
         }
-
-        /*
-          Wallet-specific UI should refresh
-          when the active account changes.
-        */
 
         setLastResolutionTxHash(
           null
@@ -352,16 +664,44 @@ export default function NtuApp() {
         setLastWithdrawal(
           null
         )
+
+        setWithdrawalCreditEth(
+          "0"
+        )
+        setPaymentPreview(null)
+
       }
 
     const handleChainChanged =
       () => {
         /*
-          Commitment context includes chain ID,
-          so the safest approach is a full reload.
+          Discard state that came from the previous chain.
+          Recovery records themselves remain stored.
         */
 
-        window.location.reload()
+        setRound(null)
+        setDomain(null)
+
+        setWithdrawalCreditEth(
+          "0"
+        )
+
+        setLastSettlement(
+          null
+        )
+
+        setLastWithdrawal(
+          null
+        )
+
+        setLastResolutionTxHash(
+          null
+        )
+        setPaymentPreview(null)
+
+
+        void refreshNetworkStatus()
+        void refreshRound()
       }
 
     ethereum.on(
@@ -385,28 +725,24 @@ export default function NtuApp() {
         handleChainChanged
       )
     }
-  }, [])
+  }, [
+    refreshNetworkStatus,
+    refreshRound,
+  ])
 
   /*
     ========================================================
-    SAVE LOCAL COMMITMENT RECORDS
+    KEEP CONTEXT-SPECIFIC RECORDS PERSISTED
     ========================================================
   */
 
   useEffect(() => {
-    try {
-      localStorage.setItem(
-        "ntu-commitments",
-        JSON.stringify(
-          commitments
-        )
-      )
-    } catch (
-      error
+    for (
+      const commitment of
+      commitments
     ) {
-      console.error(
-        "Failed to save commitments:",
-        error
+      persistCommitment(
+        commitment
       )
     }
   }, [
@@ -415,52 +751,142 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    ROUND REFRESH
+    RECONCILE AFTER RELOAD
     ========================================================
-  */
 
-  const refreshRound =
-    useCallback(
-      async () => {
-        setLoadingRound(
-          true
-        )
+    Example:
 
-        try {
-          const current =
-            await getCurrentRoundState()
-
-          setRound(
-            current
-          )
-        } catch (
-          error
-        ) {
-          console.error(
-            "Failed to load round:",
-            error
-          )
-        } finally {
-          setLoadingRound(
-            false
-          )
-        }
-      },
-      []
-    )
-
-  /*
-    Attempt to load round information when the app starts.
-
-    Until VITE_REGISTRAR_ADDRESS is configured,
-    this will simply fail quietly in the console.
+    MetaMask approved
+       ↓
+    tx confirms
+       ↓
+    browser refreshes before UI updates
+       ↓
+    this checks the chain and recovers commitmentId
   */
 
   useEffect(() => {
-    void refreshRound()
+    if (
+      !account ||
+      !networkStatus?.ready
+    ) {
+      return
+    }
+
+    let cancelled =
+      false
+
+    const configuredRegistrar =
+      import.meta.env
+        .VITE_REGISTRAR_ADDRESS as
+        | string
+        | undefined
+
+    const reconcile =
+      async () => {
+        const relevant =
+          commitments.filter(
+            (commitment) =>
+              commitment.chainId ===
+                networkStatus.chainId &&
+              Boolean(
+                commitment.registrarAddress &&
+                configuredRegistrar &&
+                commitment.registrarAddress.toLowerCase() ===
+                  configuredRegistrar.toLowerCase()
+              ) &&
+              commitment.bidder.toLowerCase() ===
+                account.toLowerCase() &&
+              commitment.submissionStatus !==
+                "confirmed"
+          )
+
+        for (
+          const commitment of
+          relevant
+        ) {
+          try {
+            const updated =
+              await reconcileBidCommitment(
+                commitment
+              )
+
+            if (
+              cancelled ||
+              updated.submissionStatus !==
+                "confirmed"
+            ) {
+              continue
+            }
+
+            persistCommitment(
+              updated
+            )
+
+            setCommitments(
+              (previous) =>
+                upsertCommitment(
+                  previous,
+                  updated
+                )
+            )
+          } catch (error) {
+            console.error(
+              "Could not reconcile saved commitment:",
+              error
+            )
+          }
+        }
+      }
+
+    void reconcile()
+
+    return () => {
+      cancelled =
+        true
+    }
   }, [
-    refreshRound,
+    account,
+    commitments,
+    networkStatus?.chainId,
+    networkStatus?.ready,
   ])
+
+  /*
+    ========================================================
+    SWITCH NETWORK
+    ========================================================
+  */
+
+  const handleSwitchNetwork =
+    async () => {
+      setSwitchingNetwork(
+        true
+      )
+
+      try {
+        await switchToConfiguredNetwork()
+
+        const status =
+          await refreshNetworkStatus()
+
+        if (
+          status?.ready
+        ) {
+          await refreshRound()
+        }
+      } catch (error) {
+        alert(
+          getFriendlyError(
+            error
+          )
+        )
+      } finally {
+        setSwitchingNetwork(
+          false
+        )
+      }
+    }
 
   /*
     ========================================================
@@ -478,39 +904,36 @@ export default function NtuApp() {
         return
       }
 
+      if (
+        !networkStatus?.ready
+      ) {
+        alert(
+          `Switch to ${
+            networkStatus?.expectedNetworkName ??
+            "the configured network"
+          } before starting a round.`
+        )
+
+        return
+      }
+
       setStartingRound(
         true
       )
 
       try {
-        const result =
-          await startAuctionRound()
-
-        console.log(
-          "Started round:",
-          result.roundId
-        )
+        await startAuctionRound()
 
         await refreshRound()
 
         if (domain) {
-          const updated =
+          setDomain(
             await checkDomain(
               domain.name
             )
-
-          setDomain(
-            updated
           )
         }
-      } catch (
-        error
-      ) {
-        console.error(
-          "Failed to start round:",
-          error
-        )
-
+      } catch (error) {
         alert(
           getFriendlyError(
             error
@@ -538,7 +961,10 @@ export default function NtuApp() {
           wallet ??
           account
 
-        if (!target) {
+        if (
+          !target ||
+          !networkStatus?.ready
+        ) {
           setWithdrawalCreditEth(
             "0"
           )
@@ -559,11 +985,9 @@ export default function NtuApp() {
           setWithdrawalCreditEth(
             credit.eth
           )
-        } catch (
-          error
-        ) {
+        } catch (error) {
           console.error(
-            "Failed to read withdrawal credit:",
+            "Failed to refresh withdrawal credit:",
             error
           )
         } finally {
@@ -574,29 +998,42 @@ export default function NtuApp() {
       },
       [
         account,
+        networkStatus?.ready,
       ]
     )
 
-  useEffect(() => {
-    if (!account) {
-      setWithdrawalCreditEth(
-        "0"
-      )
-
-      return
-    }
-
-    void refreshWithdrawalCredit(
-      account
-    )
-  }, [
-    account,
-    refreshWithdrawalCredit,
-  ])
+    useEffect(() => {
+      if (
+        !account ||
+        !networkStatus?.ready
+      ) {
+        return
+      }
+    
+      const timeoutId =
+        window.setTimeout(
+          () => {
+            void refreshWithdrawalCredit(
+              account
+            )
+          },
+          0
+        )
+    
+      return () => {
+        window.clearTimeout(
+          timeoutId
+        )
+      }
+    }, [
+      account,
+      networkStatus?.ready,
+      refreshWithdrawalCredit,
+    ])
 
   /*
     ========================================================
-    WALLET CONNECT / DISCONNECT
+    CONNECT / DISCONNECT
     ========================================================
   */
 
@@ -613,14 +1050,9 @@ export default function NtuApp() {
         setAccount(
           address
         )
-      } catch (
-        error
-      ) {
-        console.error(
-          "Wallet connection failed:",
-          error
-        )
 
+        await refreshNetworkStatus()
+      } catch (error) {
         alert(
           getFriendlyError(
             error
@@ -637,9 +1069,7 @@ export default function NtuApp() {
     async () => {
       await disconnectWallet()
 
-      setAccount(
-        null
-      )
+      setAccount(null)
 
       setWithdrawalCreditEth(
         "0"
@@ -657,31 +1087,30 @@ export default function NtuApp() {
       async (
         name: string
       ) => {
+        if (
+          !networkStatus?.ready
+        ) {
+          alert(
+            `Switch to ${
+              networkStatus?.expectedNetworkName ??
+              "the configured network"
+            } before searching domains.`
+          )
+
+          return
+        }
+
         setSearching(
           true
         )
 
-        setLastResolutionTxHash(
-          null
-        )
-
         try {
-          const result =
+          setDomain(
             await checkDomain(
               name
             )
-
-          setDomain(
-            result
           )
-        } catch (
-          error
-        ) {
-          console.error(
-            "Domain search failed:",
-            error
-          )
-
+        } catch (error) {
           alert(
             getFriendlyError(
               error
@@ -693,34 +1122,28 @@ export default function NtuApp() {
           )
         }
       },
-      []
+      [
+        networkStatus,
+      ]
     )
-
-  /*
-    ========================================================
-    REFRESH CURRENT DOMAIN
-    ========================================================
-  */
 
   const refreshCurrentDomain =
     useCallback(
       async () => {
-        if (!domain) {
+        if (
+          !domain ||
+          !networkStatus?.ready
+        ) {
           return
         }
 
         try {
-          const updated =
+          setDomain(
             await checkDomain(
               domain.name
             )
-
-          setDomain(
-            updated
           )
-        } catch (
-          error
-        ) {
+        } catch (error) {
           console.error(
             "Failed to refresh domain:",
             error
@@ -729,6 +1152,7 @@ export default function NtuApp() {
       },
       [
         domain,
+        networkStatus?.ready,
       ]
     )
 
@@ -748,17 +1172,22 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    COMMIT BID
+    COMMIT
     ========================================================
 
-    handlers.ts now:
+    Correct flow:
 
-    - canonicalises the label
-    - parses amount to exact bidWei
-    - checks maximum deposit
-    - generates commitment locally
-    - calls commitBid()
-    - returns exact bidWei for recovery
+    prepare
+       ↓
+    persist recovery record
+       ↓
+    update React
+       ↓
+    MetaMask approval
+       ↓
+    persist tx hash
+       ↓
+    wait for confirmation
   */
 
   const handleCommit =
@@ -777,48 +1206,260 @@ export default function NtuApp() {
         return
       }
 
+      if (
+        !networkStatus?.ready
+      ) {
+        alert(
+          `Switch to ${
+            networkStatus?.expectedNetworkName ??
+            "the configured network"
+          } before committing a bid.`
+        )
+
+        return
+      }
+
       setCommitting(
         true
       )
 
+      let prepared:
+        Commitment | null =
+        null
+
       try {
-        const commitment =
-          await commitBid(
+        /*
+          Does not open MetaMask.
+        */
+
+        const preparedCommitment =
+          await prepareBidCommitment(
             params
           )
 
-        setCommitments(
-          (
-            previous
-          ) => [
-            commitment,
-            ...previous,
-          ]
+        prepared =
+          preparedCommitment
+
+        /*
+          CRITICAL:
+          saved BEFORE requestBidCommitment().
+        */
+
+        persistCommitment(
+          preparedCommitment
         )
 
-        const updated =
-          await checkDomain(
-            commitment.name
+        setCommitments(
+          (previous) =>
+            upsertCommitment(
+              previous,
+              preparedCommitment
+            )
+        )
+
+        /*
+          MetaMask opens here.
+        */
+
+        const submission =
+          await requestBidCommitment(
+            preparedCommitment
           )
 
-        setDomain(
-          updated
+        /*
+          It may already exist on-chain after a reload/retry.
+        */
+
+        if (
+          submission.alreadyConfirmed
+        ) {
+          const confirmed:
+            Commitment = {
+              ...preparedCommitment,
+
+              commitmentId:
+                submission.commitmentId,
+
+              txHash:
+                submission.txHash,
+
+              submissionStatus:
+                "confirmed",
+
+              submissionError:
+                undefined,
+            }
+
+          persistCommitment(
+            confirmed
+          )
+
+          setCommitments(
+            (previous) =>
+              upsertCommitment(
+                previous,
+                confirmed
+              )
+          )
+
+          await refreshRound()
+
+          return
+        }
+
+        /*
+          MetaMask approved and transaction was broadcast.
+
+          Save tx hash immediately, before waiting.
+        */
+
+        const pending:
+          Commitment = {
+            ...preparedCommitment,
+
+            txHash:
+              submission.txHash,
+
+            submissionStatus:
+              "pending",
+
+            submissionError:
+              undefined,
+          }
+
+        persistCommitment(
+          pending
         )
 
-        await refreshRound()
-      } catch (
-        error
-      ) {
-        console.error(
-          "Commit failed:",
-          error
+        setCommitments(
+          (previous) =>
+            upsertCommitment(
+              previous,
+              pending
+            )
         )
 
-        alert(
+        try {
+          const confirmation =
+            await confirmBidCommitment(
+              pending,
+              submission.txHash
+            )
+
+          const confirmed:
+            Commitment = {
+              ...pending,
+
+              commitmentId:
+                confirmation.commitmentId,
+
+              txHash:
+                confirmation.txHash,
+
+              submissionStatus:
+                "confirmed",
+
+              submissionError:
+                undefined,
+            }
+
+          persistCommitment(
+            confirmed
+          )
+
+          setCommitments(
+            (previous) =>
+              upsertCommitment(
+                previous,
+                confirmed
+              )
+          )
+
+          setDomain(
+            await checkDomain(
+              confirmed.name
+            )
+          )
+
+          await refreshRound()
+        } catch (error) {
+          /*
+            Preserve all data even when confirmation
+            cannot be observed yet.
+          */
+
+          const failed:
+            Commitment = {
+              ...pending,
+
+              submissionStatus:
+                "failed",
+
+              submissionError:
+                getFriendlyError(
+                  error
+                ),
+            }
+
+          persistCommitment(
+            failed
+          )
+
+          setCommitments(
+            (previous) =>
+              upsertCommitment(
+                previous,
+                failed
+              )
+          )
+
+          throw error
+        }
+      } catch (error) {
+        const message =
           getFriendlyError(
             error
           )
-        )
+
+        /*
+          If MetaMask rejected, recovery data already exists.
+        */
+
+        if (prepared) {
+          const rejected =
+            message
+              .toLowerCase()
+              .includes(
+                "cancelled"
+              )
+
+          const saved:
+            Commitment = {
+              ...prepared,
+
+              submissionStatus:
+                rejected
+                  ? "rejected"
+                  : prepared.submissionStatus,
+
+              submissionError:
+                message,
+            }
+
+          persistCommitment(
+            saved
+          )
+
+          setCommitments(
+            (previous) =>
+              upsertCommitment(
+                previous,
+                saved
+              )
+          )
+        }
+
+        alert(message)
       } finally {
         setCommitting(
           false
@@ -828,11 +1469,8 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    REVEAL BID
+    REVEAL
     ========================================================
-
-    revealBid() now uses commitment.bidWei directly
-    instead of converting the display amount again.
   */
 
   const handleReveal =
@@ -849,21 +1487,24 @@ export default function NtuApp() {
       }
 
       if (
-        commitment.bidder.toLowerCase() !==
-        account.toLowerCase()
+        !networkStatus?.ready
       ) {
         alert(
-          "Switch to the wallet that created this commitment before revealing."
+          `Switch to ${
+            networkStatus?.expectedNetworkName ??
+            "the configured network"
+          } before revealing.`
         )
 
         return
       }
 
       if (
-        !commitment.bidWei
+        commitment.bidder.toLowerCase() !==
+        account.toLowerCase()
       ) {
         alert(
-          "This saved commitment does not contain the exact bidWei value required for reveal. Import a valid versioned backup."
+          "Switch to the wallet that created this commitment."
         )
 
         return
@@ -879,47 +1520,37 @@ export default function NtuApp() {
             commitment
           )
 
-        setCommitments(
-          (
-            previous
-          ) =>
-            previous.map(
-              (
-                current
-              ) =>
-                current.hash ===
-                commitment.hash
-                  ? {
-                      ...current,
+        const updated:
+          Commitment = {
+            ...commitment,
 
-                      revealed:
-                        true,
+            revealed:
+              true,
 
-                      valid:
-                        result.valid,
-                    }
-                  : current
-            )
-        )
+            valid:
+              result.valid,
+          }
 
-        const updated =
-          await checkDomain(
-            commitment.name
-          )
-
-        setDomain(
+        persistCommitment(
           updated
         )
 
-        await refreshRound()
-      } catch (
-        error
-      ) {
-        console.error(
-          "Reveal failed:",
-          error
+        setCommitments(
+          (previous) =>
+            upsertCommitment(
+              previous,
+              updated
+            )
         )
 
+        setDomain(
+          await checkDomain(
+            commitment.name
+          )
+        )
+
+        await refreshRound()
+      } catch (error) {
         alert(
           getFriendlyError(
             error
@@ -934,7 +1565,7 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    FINALIZE DOMAIN
+    FINALIZE
     ========================================================
   */
 
@@ -944,9 +1575,15 @@ export default function NtuApp() {
     ) => {
       if (!account) {
         alert(
-          "Connect your wallet before finalizing the domain."
+          "Connect your wallet before finalizing."
         )
 
+        return
+      }
+
+      if (
+        !networkStatus?.ready
+      ) {
         return
       }
 
@@ -959,24 +1596,14 @@ export default function NtuApp() {
           name
         )
 
-        const updated =
+        setDomain(
           await checkDomain(
             name
           )
-
-        setDomain(
-          updated
         )
 
         await refreshRound()
-      } catch (
-        error
-      ) {
-        console.error(
-          "Finalization failed:",
-          error
-        )
-
+      } catch (error) {
         alert(
           getFriendlyError(
             error
@@ -1009,6 +1636,12 @@ export default function NtuApp() {
       }
 
       if (
+        !networkStatus?.ready
+      ) {
+        return
+      }
+
+      if (
         commitment.bidder.toLowerCase() !==
         account.toLowerCase()
       ) {
@@ -1023,33 +1656,29 @@ export default function NtuApp() {
         commitment.hash
       )
 
-      setLastSettlement(
-        null
-      )
-
       try {
         const result =
           await settleCommitment(
             commitment
           )
 
-        setCommitments(
-          (
-            previous
-          ) =>
-            previous.map(
-              (
-                current
-              ) =>
-                current.hash ===
-                commitment.hash
-                  ? {
-                      ...current,
+        const updated:
+          Commitment = {
+            ...commitment,
 
-                      settled:
-                        true,
-                    }
-                  : current
+            settled:
+              true,
+          }
+
+        persistCommitment(
+          updated
+        )
+
+        setCommitments(
+          (previous) =>
+            upsertCommitment(
+              previous,
+              updated
             )
         )
 
@@ -1074,16 +1703,7 @@ export default function NtuApp() {
         await refreshWithdrawalCredit(
           account
         )
-
-        await refreshRound()
-      } catch (
-        error
-      ) {
-        console.error(
-          "Settlement failed:",
-          error
-        )
-
+      } catch (error) {
         alert(
           getFriendlyError(
             error
@@ -1098,7 +1718,7 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    WITHDRAW CREDIT
+    WITHDRAW
     ========================================================
   */
 
@@ -1112,12 +1732,14 @@ export default function NtuApp() {
         return
       }
 
+      if (
+        !networkStatus?.ready
+      ) {
+        return
+      }
+
       setWithdrawing(
         true
-      )
-
-      setLastWithdrawal(
-        null
       )
 
       try {
@@ -1135,14 +1757,7 @@ export default function NtuApp() {
         await refreshWithdrawalCredit(
           account
         )
-      } catch (
-        error
-      ) {
-        console.error(
-          "Withdrawal failed:",
-          error
-        )
-
+      } catch (error) {
         alert(
           getFriendlyError(
             error
@@ -1157,7 +1772,7 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    UPDATE RESOLUTION ADDRESS
+    RESOLUTION
     ========================================================
   */
 
@@ -1175,9 +1790,15 @@ export default function NtuApp() {
       }
 
       if (
+        !networkStatus?.ready
+      ) {
+        return
+      }
+
+      if (
         !domain?.owner ||
-        account.toLowerCase() !==
-          domain.owner.toLowerCase()
+        domain.owner.toLowerCase() !==
+          account.toLowerCase()
       ) {
         alert(
           "Only the domain owner can change its resolution address."
@@ -1188,10 +1809,6 @@ export default function NtuApp() {
 
       setUpdatingResolution(
         true
-      )
-
-      setLastResolutionTxHash(
-        null
       )
 
       try {
@@ -1205,22 +1822,12 @@ export default function NtuApp() {
           result.txHash
         )
 
-        const updated =
+        setDomain(
           await checkDomain(
             name
           )
-
-        setDomain(
-          updated
         )
-      } catch (
-        error
-      ) {
-        console.error(
-          "Resolution update failed:",
-          error
-        )
-
+      } catch (error) {
         alert(
           getFriendlyError(
             error
@@ -1235,13 +1842,8 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    VERSIONED BACKUP EXPORT
+    BACKUP EXPORT
     ========================================================
-
-    We no longer dump the internal Commitment objects
-    directly to JSON.
-
-    Each record becomes RevealBackupV1.
   */
 
   const handleDownloadBackup =
@@ -1261,26 +1863,21 @@ export default function NtuApp() {
         const backups =
           await Promise.all(
             commitments.map(
-              (
-                commitment
-              ) =>
+              (commitment) =>
                 createRevealBackup(
                   commitment
                 )
             )
           )
 
-        const data =
-          JSON.stringify(
-            backups,
-            null,
-            2
-          )
-
         const blob =
           new Blob(
             [
-              data,
+              JSON.stringify(
+                backups,
+                null,
+                2
+              ),
             ],
             {
               type:
@@ -1317,14 +1914,7 @@ export default function NtuApp() {
         URL.revokeObjectURL(
           url
         )
-      } catch (
-        error
-      ) {
-        console.error(
-          "Backup export failed:",
-          error
-        )
-
+      } catch (error) {
         alert(
           getFriendlyError(
             error
@@ -1335,20 +1925,8 @@ export default function NtuApp() {
 
   /*
     ========================================================
-    VERSIONED + VERIFIED BACKUP IMPORT
+    BACKUP IMPORT
     ========================================================
-
-    Import process:
-
-    1. JSON schema validation
-    2. chain check
-    3. registrar check
-    4. wallet check
-    5. recompute commitment
-    6. verify actual on-chain commitment
-    7. ONLY THEN update local state
-
-    If any record fails, no existing saved data is replaced.
   */
 
   const handleImportBackup =
@@ -1364,12 +1942,9 @@ export default function NtuApp() {
       }
 
       try {
-        const text =
-          await file.text()
-
         const parsed =
           JSON.parse(
-            text
+            await file.text()
           )
 
         const records =
@@ -1377,12 +1952,15 @@ export default function NtuApp() {
             parsed
           )
             ? parsed
-            : [
-                parsed,
-              ]
+            : [parsed]
 
         const verified:
           Commitment[] = []
+
+        /*
+          Do not overwrite valid records unless every
+          incoming backup passes validation.
+        */
 
         for (
           const raw of records
@@ -1405,84 +1983,42 @@ export default function NtuApp() {
         }
 
         /*
-          Only mutate React state once all records have
-          successfully passed verification.
+          All records passed.
         */
 
+        for (
+          const commitment of
+          verified
+        ) {
+          persistCommitment(
+            commitment
+          )
+        }
+
         setCommitments(
-          (
-            previous
-          ) => {
-            const merged =
-              [
-                ...previous,
-              ]
+          (previous) => {
+            let next =
+              previous
 
             for (
-              const incoming of verified
+              const commitment of
+              verified
             ) {
-              const index =
-                merged.findIndex(
-                  (
-                    existing
-                  ) =>
-                    existing.roundId ===
-                      incoming.roundId &&
-                    existing.bidder.toLowerCase() ===
-                      incoming.bidder.toLowerCase()
+              next =
+                upsertCommitment(
+                  next,
+                  commitment
                 )
-
-              if (
-                index >=
-                0
-              ) {
-                /*
-                  Preserve any newer UI state such as
-                  revealed/settled if already known locally.
-                */
-
-                merged[
-                  index
-                ] = {
-                  ...incoming,
-
-                  revealed:
-                    merged[
-                      index
-                    ].revealed,
-
-                  valid:
-                    merged[
-                      index
-                    ].valid,
-
-                  settled:
-                    merged[
-                      index
-                    ].settled,
-                }
-              } else {
-                merged.unshift(
-                  incoming
-                )
-              }
             }
 
-            return merged
+            return next
           }
         )
 
         alert(
           "Reveal backup verified and imported successfully."
         )
-      } catch (
-        error
-      ) {
-        console.error(
-          "Backup import failed:",
-          error
-        )
-
+      } catch (error) {
         alert(
           getFriendlyError(
             error
@@ -1497,55 +2033,171 @@ export default function NtuApp() {
     ========================================================
   */
 
-  const handleSend =
-    async (
-      params: {
-        name: string
-        amount: string
-      }
-    ) => {
-      if (!account) {
-        alert(
-          "Connect your wallet before sending ETH."
-        )
-
-        return
-      }
-
-      setSending(
-        true
+  const handlePaymentPreview =
+  async (
+    params: {
+      name: string
+      amount: string
+    }
+  ) => {
+    if (!account) {
+      alert(
+        "Connect your wallet before sending ETH."
       )
 
-      try {
-        const result =
-          await sendPayment(
-            params
-          )
+      return
+    }
 
-        setLastPayment({
-          ...params,
+    if (
+      !networkStatus?.ready
+    ) {
+      alert(
+        `Switch to ${
+          networkStatus?.expectedNetworkName ??
+          "the configured network"
+        } before sending ETH.`
+      )
 
-          ...result,
-        })
-      } catch (
-        error
-      ) {
-        console.error(
-          "Payment failed:",
+      return
+    }
+
+    setPreviewingPayment(
+      true
+    )
+
+    /*
+      Creating a new preview invalidates any old one.
+    */
+
+    setPaymentPreview(
+      null
+    )
+
+    try {
+      const result =
+        await previewPayment(
+          params
+        )
+
+      setPaymentPreview(
+        result
+      )
+    } catch (error) {
+      alert(
+        getFriendlyError(
           error
         )
-
-        alert(
-          getFriendlyError(
-            error
-          )
-        )
-      } finally {
-        setSending(
-          false
-        )
-      }
+      )
+    } finally {
+      setPreviewingPayment(
+        false
+      )
     }
+  }
+
+const handleConfirmPayment =
+  async (
+    preview:
+      PaymentPreview
+  ) => {
+    if (!account) {
+      alert(
+        "Connect your wallet before sending ETH."
+      )
+
+      return
+    }
+
+    if (
+      !networkStatus?.ready
+    ) {
+      setPaymentPreview(
+        null
+      )
+
+      alert(
+        "The network changed. Please preview the payment again."
+      )
+
+      return
+    }
+
+    setSending(
+      true
+    )
+
+    try {
+      const result =
+        await confirmPayment(
+          preview
+        )
+
+      setLastPayment({
+        name:
+          preview.name,
+
+        amount:
+          preview.amount,
+
+        resolvedAddress:
+          result.resolvedAddress,
+
+        txHash:
+          result.txHash,
+      })
+
+      /*
+        A successful payment consumes the preview.
+      */
+
+      setPaymentPreview(
+        null
+      )
+    } catch (error) {
+      /*
+        Important:
+        any failed confirmation requires a fresh preview.
+
+        This covers stale recipient/network.
+      */
+
+      setPaymentPreview(
+        null
+      )
+
+      alert(
+        getFriendlyError(
+          error
+        )
+      )
+    } finally {
+      setSending(
+        false
+      )
+    }
+  }
+
+const handleClearPaymentPreview =
+  () => {
+    if (sending) {
+      return
+    }
+
+    setPaymentPreview(
+      null
+    )
+  }
+
+  /*
+    ========================================================
+    WRITE ACCOUNT
+    ========================================================
+  */
+
+  const writeAccount =
+    networkStatus?.ready
+      ? account
+      : null
 
   /*
     ========================================================
@@ -1561,11 +2213,17 @@ export default function NtuApp() {
       />
 
       <Navbar
-        account={
-          account
-        }
+        account={account}
         connecting={
           connecting
+        }
+        networkName={
+          networkStatus?.networkName ??
+          "Unknown network"
+        }
+        networkReady={
+          networkStatus?.ready ??
+          false
         }
         onConnect={
           handleConnect
@@ -1576,13 +2234,106 @@ export default function NtuApp() {
       />
 
       <main className="relative mx-auto flex max-w-6xl flex-col gap-10 px-4 pb-20 pt-14 sm:px-6 sm:pt-20">
+        {loadingNetwork && (
+          <div className="rounded-2xl border border-zinc-200 bg-white px-5 py-4 text-sm text-zinc-600">
+            Checking wallet network…
+          </div>
+        )}
+
+        {!loadingNetwork &&
+          networkStatus &&
+          !networkStatus.correctNetwork && (
+            <div className="flex flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-semibold text-amber-950">
+                  Wrong network
+                </p>
+
+                <p className="mt-1 text-sm text-amber-800">
+                  MetaMask is currently connected to{" "}
+                  <strong>
+                    {
+                      networkStatus.networkName
+                    }
+                  </strong>
+                  . This registrar is configured for{" "}
+                  <strong>
+                    {
+                      networkStatus.expectedNetworkName
+                    }
+                  </strong>
+                  .
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={
+                  switchingNetwork
+                }
+                onClick={() =>
+                  void handleSwitchNetwork()
+                }
+                className="rounded-xl bg-amber-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {switchingNetwork
+                  ? "Switching…"
+                  : `Switch to ${networkStatus.expectedNetworkName}`}
+              </button>
+            </div>
+          )}
+
+        {!loadingNetwork &&
+          networkStatus?.correctNetwork &&
+          !networkStatus.registrarConfigured && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4">
+              <p className="font-semibold text-red-950">
+                Registrar not configured
+              </p>
+            </div>
+          )}
+
+        {!loadingNetwork &&
+          networkStatus?.correctNetwork &&
+          networkStatus.registrarConfigured &&
+          !networkStatus.registrarExists && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4">
+              <p className="font-semibold text-red-950">
+                Registrar not found
+              </p>
+
+              <p className="mt-1 text-sm text-red-800">
+                No registrar contract bytecode was found at the configured address.
+              </p>
+            </div>
+          )}
+
+        {!loadingNetwork &&
+          networkStatus?.ready && (
+            <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm">
+              <span>
+                Connected to{" "}
+                <strong>
+                  {
+                    networkStatus.networkName
+                  }
+                </strong>
+              </span>
+
+              <span className="font-mono text-xs">
+                Chain{" "}
+                {
+                  networkStatus.chainId
+                }
+              </span>
+            </div>
+          )}
+
         <RoundSection
           account={
-            account
+            writeAccount
           }
-          round={
-            round
-          }
+          round={round}
           loading={
             loadingRound
           }
@@ -1607,9 +2358,7 @@ export default function NtuApp() {
         />
 
         <DomainStatusCard
-          domain={
-            domain
-          }
+          domain={domain}
           finalizing={
             finalizing
           }
@@ -1623,11 +2372,9 @@ export default function NtuApp() {
 
         <div className="grid gap-6 lg:grid-cols-2">
           <BidForm
-            domain={
-              domain
-            }
+            domain={domain}
             account={
-              account
+              writeAccount
             }
             submitting={
               committing
@@ -1641,11 +2388,9 @@ export default function NtuApp() {
             commitments={
               commitments
             }
-            domain={
-              domain
-            }
+            domain={domain}
             account={
-              account
+              writeAccount
             }
             revealingHash={
               revealingHash
@@ -1664,7 +2409,7 @@ export default function NtuApp() {
 
         <SettlementSection
           account={
-            account
+            writeAccount
           }
           commitments={
             commitments
@@ -1699,11 +2444,9 @@ export default function NtuApp() {
         />
 
         <ResolutionSection
-          domain={
-            domain
-          }
+          domain={domain}
           account={
-            account
+            writeAccount
           }
           updating={
             updatingResolution
@@ -1716,20 +2459,30 @@ export default function NtuApp() {
           }
         />
 
-        <PaymentSection
-          account={
-            account
-          }
-          sending={
-            sending
-          }
-          lastPayment={
-            lastPayment
-          }
-          onSend={
-            handleSend
-          }
-        />
+<PaymentSection
+  account={writeAccount}
+  previewing={
+    previewingPayment
+  }
+  sending={
+    sending
+  }
+  preview={
+    paymentPreview
+  }
+  lastPayment={
+    lastPayment
+  }
+  onPreview={
+    handlePaymentPreview
+  }
+  onConfirm={
+    handleConfirmPayment
+  }
+  onClearPreview={
+    handleClearPaymentPreview
+  }
+/>
       </main>
 
       <footer className="border-t border-zinc-200 py-6 text-center text-xs text-zinc-500">
