@@ -1,21 +1,21 @@
 # Frontend integration findings
 
 Historical captured revisions: `7217ac7`, `16decbd`, and later `b753e49`.
-Contract main is `cb1f3c4`. The current UI correction was applied locally on
-registrar-validation `67f8874` and had not yet been pushed when these results
-were recorded. This document distinguishes historical defects, changes and
-actual retests. Older reproductions remain in `history/frontend-7217ac7.md`.
+Contract main is `cb1f3c4`. The reviewed UI corrections were integrated
+on `feature/registrar-validation`. This document distinguishes historical
+defects, changes and actual retests. Older reproductions remain in
+`history/frontend-7217ac7.md`.
 
-| ID | Status through 1 November 2026 |
+| ID | Status through 2 November 2026 |
 | --- | --- |
 | FE-01 | Unused icon and orphan component originally broke production build; repaired and build passed. |
 | FE-02–FE-05 | Short-name, round-zero, reservation and owner/recipient mismatches were historical; the later handler passed these checks. |
 | FE-06 | Contract payment already used the checked path. The added full recipient/amount/chain preview was observed with cancellation and then a successful 0.001 ETH browser payment. Stale-recipient race passed in current-handler EVM test, not live browser. |
-| FE-07 | Browser import originally lost IDs and times; repair restored #1/#2. Exact #7 wei and wrong-context/tampered imports passed. Round #7 prepared record survived reload after canceling webpage confirmation. A fresh local round #1 MetaMask rejection also preserved the prepared record. Round #2 preserved a pending transaction across reload; after MetaMask reported a failed transaction, receipt reconciliation changed the stale Submitted label to Commit failed. Successful pending-receipt reconciliation remains unobserved. |
+| FE-07 | Browser import originally lost IDs and times; repair restored #1/#2. Exact #7 wei and wrong-context/tampered imports passed. Round #7 prepared record survived reload after canceling webpage confirmation. A fresh local round #1 MetaMask rejection also preserved the prepared record. Round #2 preserved a pending transaction across reload; after MetaMask reported a failed transaction, receipt reconciliation changed the stale Submitted label to Commit failed. A separate fresh-chain round #6 preserved a pending commitment across refresh and reconciled it to on-chain ID #2 after mining. |
 | FE-08 | Auction lifecycle screens exercised through seven local rounds. |
 | FE-09 | Wrong-chain `BAD_DATA` and mislabeled navbar reproduced. Corrected local navbar and visible chain-mismatch warning observed; search and write actions were blocked with wallet on 11155111 and registrar configured for 31337. |
 | FE-10 | Input originally filtered unsupported characters; after correction `bad_name` remained visible and Search rejected it. No wrong-name transaction was observed. |
-| FE-11 | After local RPC time advances, the UI showed 7m54s in a 120-second reveal window and offered Reveal; the contract rejected the attempt. The first chain-clock correction then showed Reveal at 0s while the latest block still had five seconds left. With the follow-up applied, the page showed Awaiting chain block and then Round ended after a block crossed the deadline. |
+| FE-11 | After local RPC time advances, the UI showed 7m54s in a 120-second reveal window and offered Reveal; the contract rejected the attempt. The first chain-clock correction then showed Reveal at 0s while the latest block still had five seconds left. With the follow-up applied, the page showed Awaiting chain block and then Round ended after a block crossed the deadline. In a later round, a reveal mined at `revealEnd - 1` succeeded on chain. |
 
 ## FE-01: build gate
 
@@ -63,8 +63,11 @@ showing Submitted. The correction polls saved transaction receipts and verifies
 successful commitments against the registrar; a failed receipt marks the
 record Commit failed without erasing the preimage. After the local patch and
 refresh, the browser showed Commit failed. The transaction's revert cause was
-not established. A successful receipt arriving after reload still needs a
-browser check.
+not established. In a separate fresh-chain round #6, a 0.02 ETH bid stayed
+Submitted without an ID after refresh while mining was paused. A block mined
+at `commitEnd - 1` confirmed it as commitment #2, and the browser displayed
+Committed with ID #2. This demonstrates successful receipt recovery after
+reload under controlled local mining.
 
 The prepared record appeared as **Unrevealed** under the generic Your
 commitments list even though it had no on-chain ID. This is a wording issue to
@@ -117,7 +120,15 @@ A transaction can still cross a deadline between the final read and inclusion.
 With the follow-up applied, the browser displayed Awaiting chain block and,
 after a six-second local time advance and a mined block, Round ended. No bid
 was submitted in that round; action acceptance at this boundary was not
-tested manually.
+tested manually in that round. A later fresh-chain round #6 confirmed a
+reveal transaction at `revealEnd - 1` with receipt status 1 and on-chain
+`revealed: true`. Its name was finalized; settlement credited 0.08 ETH and
+withdrawal reduced the credit to zero. MetaMask also displayed failed
+transaction notifications during this sequence. Its latest Failed Activity
+entry was the earlier round #5 commit, `0xa7adb21b29c5c4de40a169c77bac0c0b95c5723d834f69eef75c2b8c9fef7188`
+(receipt status 0), while round #6 commit `0x85164ee8367293a094014ed61018e06f598124928e719ddeda5954f26a2b11ea`
+had receipt status 1. The contract reads support the later successful
+outcomes; the repeated notification trigger was not independently established.
 
 ## Test provenance
 

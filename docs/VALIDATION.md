@@ -165,8 +165,9 @@ and screenshots were not captured in the repository. On 2 November, a fresh
 local round preserved a pending commit across reload with no ID. MetaMask
 reported that transaction failed; the original UI stayed Submitted, and a
 local receipt-reconciliation correction subsequently displayed Commit failed.
-The revert reason was not established. A successful delayed receipt after
-reload and a live stale-recipient race remain unobserved.
+The revert reason was not established. A separate fresh-chain round #6
+subsequently exercised successful delayed receipt reconciliation after reload.
+The live browser stale-recipient race remains unobserved.
 The next local round confirmed a bid as commitment #1 after refresh, but the
 displayed Reveal countdown was 7m54s despite a 120-second window after RPC
 time advances. The reveal attempt failed with a phase error; after refresh the
@@ -183,6 +184,26 @@ with the follow-up applied, the browser displayed **Awaiting chain block**.
 After `evm_increaseTime` with `[6]` and `evm_mine`, Refresh displayed
 **Round ended**. No bid was submitted in this round; the observation verifies
 the phase display, not a transaction at the exact deadline.
+
+In a later fresh-chain round #6, a 0.02 ETH bid for `receipt-pass-06.ntu`
+remained **Submitted, checking chain** after reload with automining paused.
+Mining at `commitEnd - 1` confirmed commitment #2, and the browser restored
+its on-chain ID. With the reveal window open, the estimated countdown later
+showed **Awaiting chain block**; a new block inside the window renewed the
+action. The pending reveal was mined at `revealEnd - 1` and returned receipt
+status 1 with on-chain `revealed: true`. A direct read after finalization
+showed the bidder as registered owner, winning commitment #2, cleared
+reservation, round phase Ended and automining enabled. Settlement set
+`settled: true` and credited 0.08 ETH; withdrawal reduced the credit to
+0 ETH, with no pending transactions. MetaMask displayed failed-transaction
+notifications in the same sequence. MetaMask's latest Failed Activity entry
+was the earlier round #5 commit transaction
+`0xa7adb21b29c5c4de40a169c77bac0c0b95c5723d834f69eef75c2b8c9fef7188`
+(block 22, receipt status 0); round #6's commit transaction
+`0x85164ee8367293a094014ed61018e06f598124928e719ddeda5954f26a2b11ea`
+was confirmed (block 25, receipt status 1). The on-chain reads establish
+the later successful actions; the repeated notification's trigger remains
+unverified. This round was on local chain 31337, not Sepolia.
 
 ## Current frontend regression command, 2 November
 
@@ -210,8 +231,8 @@ change; the current frontend handler check and TypeScript typecheck passed.
 
 ## Remaining integration work
 
-1. Check successful receipt reconciliation after reload and the live browser
-   stale-recipient race without claiming they passed from the failed-receipt run.
+1. Check the live browser stale-recipient race separately from the passing
+   current-handler test and the completed delayed-receipt browser run.
 2. Record the final integrated revision and have a teammate reproduce the
    browser/wallet flow from that revision.
 3. Keep the 13 high/5 moderate dependency finding visible unless a compatible
