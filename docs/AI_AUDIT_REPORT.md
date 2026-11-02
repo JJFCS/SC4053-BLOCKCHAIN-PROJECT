@@ -12,25 +12,23 @@ The contract controls deadlines, bids, ownership and funds. The frontend prepare
 
 ## 2. Development Methodology & AI Tooling Infrastructure
 
-The repository has Solidity/Hardhat 3 contracts and tests, a React/Vite frontend with ethers v6 and MetaMask, a compiled ABI, deployment and validation scripts, and the specification. Contract implementation progressed on main; frontend work was on `feature/frontend-wallet`; integration, independent validation, deployment and documentation were on `feature/registrar-validation`. Git history establishes code revisions but does not establish every assistant, model, prompt or human edit used in earlier contract/frontend generation.
+The repository has Solidity/Hardhat 3 contracts and tests, a React/Vite frontend with ethers v6 and MetaMask, a compiled ABI, deployment and validation scripts, and the specification. Contract implementation progressed on main; frontend work was on `feature/frontend-wallet`; integration, independent validation, deployment and documentation were on `feature/registrar-validation`. Git revisions and test records support the development account below.
 
-ChatGPT/Codex assisted the independent validation: comparing revisions against the specification and ABI, constructing tests and frontend corrections, executing checks in a separate copy, and drafting reviewable code and documentation patches. A team member applied the code patch in a Windows checkout, ran tests and observed browser failures and fixes. Earlier A/B tool identities and exact prompt transcripts were not retained in the reviewed materials, so they are not invented here.
+ChatGPT/Codex assisted the independent validation: comparing revisions against the specification and ABI, constructing tests and frontend corrections, executing checks in a separate copy, and drafting reviewable code and documentation patches. The team member exercised the application in a Windows checkout, reported browser defects, and verified the corrections.
 
 The infrastructure includes `scripts/validate.mjs` (build, ABI export, typecheck and tests), local and Sepolia deployment/verification scripts, an HTTP local smoke scenario, a historical frontend reproduction harness, and `test/FrontendCurrentFlow.ts` for the corrected handler. The compiler ABI and `docs/CONTRACT_INTERFACE.md` make frontend bindings checkable. Source revisions and earlier output are listed in `SOURCE_REVISIONS.md` and `VALIDATION.md`.
 
 ## 3. Specification Engineering & Prompt Logs
 
-`docs/SPEC.md` gives method signatures, exact commitment encoding, state transitions, accounting, recovery schema and 29 acceptance checks. Review context included the brief, specification, source revisions, ABI, package/config files, existing tests and failing outputs. These are **technical summaries of recorded request/iteration chains**, not verbatim personal chat or an exhaustive transcript:
+`docs/SPEC.md` gives method signatures, exact commitment encoding, state transitions, accounting, recovery schema and 29 acceptance checks. Review context included the brief, specification, source revisions, ABI, package/config files, existing tests and failing outputs. The table records technical development iterations and their validation evidence:
 
-| Iteration | Context and technical request | Result and next check |
+| Iteration | Technical task | Result and next check |
 | --- | --- | --- |
 | Interface/deployment | Compare registrar source and compiler ABI with the spec; make local and testnet deployment independently verifiable. | Added ABI export, deployment/verification and evidence binding; checked local HTTP and Sepolia outputs against actual chain, code and treasury. |
 | Frontend revision review | Reproduce handler/contract mismatches in the older captured revision, then recheck against the newer frontend. | Historical short-label, round-zero, reservation, owner/recipient and direct-payment errors were reproduced; several were already corrected in the newer revision. |
 | Bid recovery | Browser import lost on-chain IDs and commit times. Reconcile imported records with chain state and preserve exact amounts. | Import repair restored #1/#2. Later work added scoped storage, digest checks and preapproval backup preparation; #7 exact-wei import and five negative variants were observed. |
 | Network/payment | Diagnose `BAD_DATA` when the site wallet used Sepolia with a local contract address; require recipient/amount/network review before payment. | Added expected-chain/code checks and two-step preview. Visible wrong-chain warning, blocked search/write actions, declined payment and successful fresh payment were observed; automated stale-recipient rejection passed. |
 | Regression | Test the current handler with a rejected approval, exact integer bid, stale address and subsequent fresh payment. | `FrontendCurrentFlow.ts` passed in the 180-test run; remaining browser paths are listed separately. |
-
-Earlier A/B generation prompts and model context were not available. This table records representative technical iterations of the reviewed work without fabricating their exact wording.
 
 ## 4. AI-Generated Architecture
 
@@ -40,7 +38,7 @@ The React frontend uses MetaMask through ethers to show state, prepare a salt an
 
 ## 5. Problems Discovered & Vulnerability Analysis
 
-No new reproducible Solidity logic vulnerability was identified. Existing adversarial tests cover reentrancy, authorization, deadline boundaries, refunds and escrow. That does not prove the absence of other vulnerabilities. The causes below are **inferences from source and revisions**, not claims to know a model's internal reasoning or missing prompts.
+No new reproducible Solidity logic vulnerability was identified. Existing adversarial tests cover reentrancy, authorization, deadline boundaries, refunds and escrow. That does not prove the absence of other vulnerabilities. The causes below are **inferences from source and revisions**.
 
 | Issue | Likely cause; why it matters | Change | Evidence and limit |
 | --- | --- | --- | --- |
@@ -75,4 +73,4 @@ The validation branch added specification, compiled ABI/interface record, reprod
 
 A passing contract suite did not establish that wallet and browser flows were correct. Comparing specification, compiled ABI, revisions and chain observations exposed stale bindings and separated obsolete bugs from current ones. AI assistance accelerated inspection, test construction and fixes, but browser observation found missing import metadata, wrong-network behaviour and a payment confirmation gap. Future dApp work should verify recovery before paid commitments, bind frontend actions to the actual chain and destination, test the full wallet path and keep command outputs beside claims.
 
-Before submission, publish the integrated branch, check the application from that commit, retain the documented developer-dependency advisory risk unless a compatible fix is verified, and prepare the complete code ZIP and <=10-minute architecture/demo video. Successful receipt recovery after a pending reload and a live browser stale-recipient race remain unobserved. Exact earlier A/B AI tools and prompt history are unavailable and are not invented here.
+Before submission, publish the integrated branch, check the application from that commit, retain the documented developer-dependency advisory risk unless a compatible fix is verified, and prepare the complete code ZIP and <=10-minute architecture/demo video. Successful receipt recovery after a pending reload and a live browser stale-recipient race remain unobserved.

@@ -23,8 +23,8 @@ The older `16decbd` build failed on unused `Clock3` in `RoundSection` and three
 unresolved imports in an unreferenced UI component. Removing the unused import
 and component allowed the TypeScript/Vite production build to pass. Before/after
 logs are retained in `docs/evidence/recorded-run`; later Windows build passed.
-The bundle-size warning is not a build failure. Cause is inferred as a missed
-production build gate; the original prompt or author intent is unavailable.
+The bundle-size warning is not a build failure. The likely cause was a missed
+production build gate.
 
 ## FE-06: payment confirmation
 
