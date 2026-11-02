@@ -10,7 +10,7 @@ defects, changes and actual retests. Older reproductions remain in
 | --- | --- |
 | FE-01 | Unused icon and orphan component originally broke production build; repaired and build passed. |
 | FE-02–FE-05 | Short-name, round-zero, reservation and owner/recipient mismatches were historical; the later handler passed these checks. |
-| FE-06 | Contract payment already used the checked path. The added full recipient/amount/chain preview was observed with cancellation and then a successful 0.001 ETH browser payment. Stale-recipient race passed in current-handler EVM test, not live browser. |
+| FE-06 | Contract payment already used the checked path. The added full recipient/amount/chain preview was observed with cancellation and successful browser payments. A stale-recipient race was rejected in the current-handler EVM test and a later local browser run, followed by fresh review and a reported 0.001 ETH payment. |
 | FE-07 | Browser import originally lost IDs and times; repair restored #1/#2. Exact #7 wei and wrong-context/tampered imports passed. Round #7 prepared record survived reload after canceling webpage confirmation. A fresh local round #1 MetaMask rejection also preserved the prepared record. Round #2 preserved a pending transaction across reload; after MetaMask reported a failed transaction, receipt reconciliation changed the stale Submitted label to Commit failed. A separate fresh-chain round #6 preserved a pending commitment across refresh and reconciled it to on-chain ID #2 after mining. |
 | FE-08 | Auction lifecycle screens exercised through seven local rounds. |
 | FE-09 | Wrong-chain `BAD_DATA` and mislabeled navbar reproduced. Corrected local navbar and visible chain-mismatch warning observed; search and write actions were blocked with wallet on 11155111 and registrar configured for 31337. |
@@ -37,7 +37,15 @@ Hardhat Local chain 31337; a canceled wallet request was handled; a subsequent
 0.001 ETH name payment succeeded with UI transaction `0x529b07…7eefbe`.
 The current-handler EVM test changed resolution between preview and send,
 rejected the stale call without paying either recipient, then succeeded after
-fresh review. That race has not been repeated with a live browser wallet.
+fresh review. In a later local browser test, the owner of
+`receipt-pass-06.ntu` changed resolution in a second tab from
+`0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266` to
+`0x70997970C51812dc3A010C7d01b50e0d17dc79C8` (UI transaction
+`0xe5cce5…9c1cac`) while the first tab held the old 0.001 ETH preview.
+Confirming that old preview displayed the recipient-changed error. The first
+tab then reviewed the new address and reported a successful 0.001 ETH payment
+to it (`0xfdb826…d55e5f`). The later payment receipt and balance were not
+independently captured; this was a Hardhat Local browser run.
 
 ## FE-07: reveal backup and context
 

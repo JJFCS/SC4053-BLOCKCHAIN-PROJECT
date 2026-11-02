@@ -167,7 +167,13 @@ reported that transaction failed; the original UI stayed Submitted, and a
 local receipt-reconciliation correction subsequently displayed Commit failed.
 The revert reason was not established. A separate fresh-chain round #6
 subsequently exercised successful delayed receipt reconciliation after reload.
-The live browser stale-recipient race remains unobserved.
+The live browser stale-recipient race was subsequently observed on the local
+chain: a second tab changed `receipt-pass-06.ntu` from the previewed owner
+address to `0x70997970C51812dc3A010C7d01b50e0d17dc79C8`. The first tab
+rejected its stale 0.001 ETH preview with a recipient-changed message. A new
+preview displayed the new address, and the UI reported a 0.001 ETH payment
+(`0xfdb826…d55e5f`). Full receipts and a balance read for that later payment
+were not separately captured.
 The next local round confirmed a bid as commitment #1 after refresh, but the
 displayed Reveal countdown was 7m54s despite a 120-second window after RPC
 time advances. The reveal attempt failed with a phase error; after refresh the
@@ -231,10 +237,8 @@ change; the current frontend handler check and TypeScript typecheck passed.
 
 ## Remaining integration work
 
-1. Check the live browser stale-recipient race separately from the passing
-   current-handler test and the completed delayed-receipt browser run.
-2. Record the final integrated revision and have a teammate reproduce the
+1. Record the final integrated revision and have a teammate reproduce the
    browser/wallet flow from that revision.
-3. Keep the 13 high/5 moderate dependency finding visible unless a compatible
+2. Keep the 13 high/5 moderate dependency finding visible unless a compatible
    update is actually applied and retested. Finish the group code package and
    demo video.
