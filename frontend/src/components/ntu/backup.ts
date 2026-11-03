@@ -10,10 +10,11 @@ import {
   import {
     computeCommitmentHash,
     getRegistrarAddress,
+    normalizeLabel,
     validateLabel,
     type Commitment,
+    type CommitmentSubmissionStatus,
   } from "./handlers"
-  
   
   const UINT256_MAX =
     (1n << 256n) - 1n
@@ -24,18 +25,78 @@ import {
     "function getCommitment(uint256 commitmentId) view returns (tuple(address bidder, bytes32 digest, uint256 roundId, uint256 deposit, bool revealed, bool valid, bytes32 labelHash, uint256 bidWei, bool settled))",
   ]
   
+  /*
+    ============================================================
+    BACKUP FORMAT
+    ============================================================
+  
+    The first fields are the required V1 backup fields.
+  
+    The fields after commitTxHash are optional recovery metadata.
+    This keeps older V1 backups compatible while allowing newer
+    backups to preserve local UI/recovery state.
+  */
+  
   export interface RevealBackupV1 {
     schemaVersion: 1
+  
     chainId: string
     registrarAddress: string
     bidderAddress: string
     roundId: string
+  
     label: string
     bidWei: string
     salt: string
     commitment: string
-    commitTxHash: string | null
+  
+    commitTxHash:
+      string | null
+  
+    /*
+      Optional recovery metadata.
+  
+      Older backups without these fields still work.
+    */
+  
+    createdAt?: number
+  
+    submissionStatus?:
+      CommitmentSubmissionStatus
+  
+    submissionError?: string
+  
+    commitmentId?: string
+  
+    revealed?: boolean
+    valid?: boolean
+    settled?: boolean
   }
+  
+  export interface BackupVerificationResult {
+    onChainFound: boolean
+  
+    commitmentId?:
+      string
+  
+    revealed:
+      boolean
+  
+    valid?:
+      boolean
+  
+    settled:
+      boolean
+  }
+  
+  const ALLOWED_STATUSES:
+    CommitmentSubmissionStatus[] = [
+      "prepared",
+      "pending",
+      "confirmed",
+      "rejected",
+      "failed",
+    ]
   
   function requireEthereum() {
     if (!window.ethereum) {
@@ -95,12 +156,9 @@ import {
     EXPORT
     ============================================================
   
-    IMPORTANT:
+    Preserve the ORIGINAL commitment context.
   
-    The backup uses the ORIGINAL context stored when the
-    commitment was prepared.
-  
-    It does not ask MetaMask what chain is selected now.
+    We do not use the wallet's currently selected network here.
   */
   
   export async function createRevealBackup(
@@ -126,14 +184,16 @@ import {
     let bidWei:
       string
   
-    if (commitment.bidWei) {
+    if (
+      commitment.bidWei
+    ) {
       bidWei =
         commitment.bidWei
     } else {
       /*
-        Legacy compatibility only.
+        Legacy compatibility.
   
-        New records always store bidWei directly.
+        New records always store exact bidWei.
       */
   
       bidWei =
@@ -172,6 +232,31 @@ import {
       commitTxHash:
         commitment.txHash ||
         null,
+  
+      /*
+        Optional recovery metadata.
+      */
+  
+      createdAt:
+        commitment.createdAt,
+  
+      submissionStatus:
+        commitment.submissionStatus,
+  
+      submissionError:
+        commitment.submissionError,
+  
+      commitmentId:
+        commitment.commitmentId,
+  
+      revealed:
+        commitment.revealed,
+  
+      valid:
+        commitment.valid,
+  
+      settled:
+        commitment.settled,
     }
   }
   
@@ -272,10 +357,30 @@ import {
   
     if (
       typeof backup.label !==
-      "string"
+        "string"
     ) {
       throw new Error(
         "Backup label is missing."
+      )
+    }
+  
+    /*
+      Backup labels must already be canonical.
+  
+      We do not silently repair malformed imported backups.
+    */
+  
+    const canonicalLabel =
+      normalizeLabel(
+        backup.label
+      )
+  
+    if (
+      canonicalLabel !==
+      backup.label
+    ) {
+      throw new Error(
+        "Backup label is not in canonical form."
       )
     }
   
@@ -325,6 +430,106 @@ import {
       )
     }
   
+    /*
+      Optional recovery fields.
+    */
+  
+    if (
+      backup.createdAt !==
+        undefined &&
+      (
+        typeof backup.createdAt !==
+          "number" ||
+        !Number.isFinite(
+          backup.createdAt
+        ) ||
+        !Number.isInteger(
+          backup.createdAt
+        ) ||
+        backup.createdAt <=
+          0
+      )
+    ) {
+      throw new Error(
+        "Backup createdAt value is invalid."
+      )
+    }
+  
+    if (
+      backup.submissionStatus !==
+        undefined &&
+      !ALLOWED_STATUSES.includes(
+        backup.submissionStatus
+      )
+    ) {
+      throw new Error(
+        "Backup contains an invalid submission status."
+      )
+    }
+  
+    if (
+      backup.submissionError !==
+        undefined &&
+      typeof backup.submissionError !==
+        "string"
+    ) {
+      throw new Error(
+        "Backup contains an invalid submission error."
+      )
+    }
+  
+    if (
+      backup.commitmentId !==
+        undefined
+    ) {
+      const commitmentId =
+        parseUint256(
+          backup.commitmentId,
+          "commitmentId"
+        )
+  
+      if (
+        commitmentId <= 0n
+      ) {
+        throw new Error(
+          "commitmentId must be greater than zero."
+        )
+      }
+    }
+  
+    if (
+      backup.revealed !==
+        undefined &&
+      typeof backup.revealed !==
+        "boolean"
+    ) {
+      throw new Error(
+        "Backup revealed status is invalid."
+      )
+    }
+  
+    if (
+      backup.valid !==
+        undefined &&
+      typeof backup.valid !==
+        "boolean"
+    ) {
+      throw new Error(
+        "Backup validity status is invalid."
+      )
+    }
+  
+    if (
+      backup.settled !==
+        undefined &&
+      typeof backup.settled !==
+        "boolean"
+    ) {
+      throw new Error(
+        "Backup settlement status is invalid."
+      )
+    }
+  
     return backup as
       RevealBackupV1
   }
@@ -334,15 +539,12 @@ import {
     IMPORT VERIFICATION
     ============================================================
   
-    A backup can exist before an on-chain transaction exists.
+    Important:
   
-    Therefore:
-    - structure/context/hash MUST validate
-    - if an on-chain commitment exists, it MUST match
-    - if no on-chain commitment exists and commitTxHash is null,
-      the prepared recovery record is still valid
+    A backup is allowed to exist BEFORE an on-chain transaction.
   
-    revealBid() performs the final on-chain check before reveal.
+    Therefore a valid prepared/rejected backup must not be rejected
+    merely because getCommitmentId() returns zero.
   */
   
   export async function verifyRevealBackup(
@@ -350,7 +552,7 @@ import {
       RevealBackupV1,
     connectedAccount:
       string
-  ): Promise<void> {
+  ): Promise<BackupVerificationResult> {
     const provider =
       new BrowserProvider(
         requireEthereum()
@@ -456,31 +658,32 @@ import {
       )
   
     /*
-      No transaction was ever submitted.
+      No on-chain commitment.
   
-      This is valid recovery data from a rejected or
-      not-yet-approved commit.
-    */
-  
-    if (
-      commitmentId === 0n &&
-      backup.commitTxHash === null
-    ) {
-      return
-    }
-  
-    /*
-      A transaction hash exists but nothing is recorded
-      on-chain yet.
-  
-      It may still be pending, but don't pretend it is
-      confirmed.
+      This is still valid recovery data if:
+      - MetaMask was rejected
+      - approval was never requested
+      - the transaction is pending/not yet observable
     */
   
     if (
       commitmentId === 0n
     ) {
-      return
+      return {
+        onChainFound:
+          false,
+  
+        revealed:
+          backup.revealed ??
+          false,
+  
+        valid:
+          backup.valid,
+  
+        settled:
+          backup.settled ??
+          false,
+      }
     }
   
     const stored =
@@ -496,6 +699,34 @@ import {
         "The backup commitment does not match the commitment recorded on-chain."
       )
     }
+  
+    /*
+      Once an on-chain record exists, chain state is the
+      source of truth for reveal/settlement status.
+    */
+  
+    return {
+      onChainFound:
+        true,
+  
+      commitmentId:
+        commitmentId.toString(),
+  
+      revealed:
+        Boolean(
+          stored.revealed
+        ),
+  
+      valid:
+        Boolean(
+          stored.valid
+        ),
+  
+      settled:
+        Boolean(
+          stored.settled
+        ),
+    }
   }
   
   /*
@@ -506,8 +737,60 @@ import {
   
   export function backupToCommitment(
     backup:
-      RevealBackupV1
+      RevealBackupV1,
+    verification?:
+      BackupVerificationResult
   ): Commitment {
+    let submissionStatus:
+      CommitmentSubmissionStatus
+  
+    /*
+      Chain record found = definitely confirmed.
+    */
+  
+    if (
+      verification?.onChainFound
+    ) {
+      submissionStatus =
+        "confirmed"
+    } else if (
+      backup.commitTxHash
+    ) {
+      /*
+        A tx hash exists, but no on-chain commitment was
+        found yet.
+  
+        Preserve a known failed status. Otherwise treat the
+        transaction as pending rather than falsely confirmed.
+      */
+  
+      submissionStatus =
+        backup.submissionStatus ===
+        "failed"
+          ? "failed"
+          : "pending"
+    } else {
+      /*
+        No transaction hash.
+  
+        Prepared, rejected and failed records are all valid
+        local recovery states.
+      */
+  
+      if (
+        backup.submissionStatus ===
+          "rejected" ||
+        backup.submissionStatus ===
+          "failed"
+      ) {
+        submissionStatus =
+          backup.submissionStatus
+      } else {
+        submissionStatus =
+          "prepared"
+      }
+    }
+  
     return {
       chainId:
         backup.chainId,
@@ -544,18 +827,42 @@ import {
         backup.commitTxHash ??
         "",
   
+      commitmentId:
+        verification?.commitmentId ??
+        backup.commitmentId,
+  
+      /*
+        Preserve the original local timestamp where available.
+        Old V1 backups without it remain compatible.
+      */
+  
       createdAt:
+        backup.createdAt ??
         Date.now(),
   
-      submissionStatus:
-        backup.commitTxHash
-          ? "pending"
-          : "prepared",
+      submissionStatus,
+  
+      submissionError:
+        submissionStatus ===
+        "confirmed"
+          ? undefined
+          : backup.submissionError,
   
       revealed:
-        false,
+        verification?.onChainFound
+          ? verification.revealed
+          : backup.revealed ??
+            false,
+  
+      valid:
+        verification?.onChainFound
+          ? verification.valid
+          : backup.valid,
   
       settled:
-        false,
+        verification?.onChainFound
+          ? verification.settled
+          : backup.settled ??
+            false,
     }
   }

@@ -293,6 +293,130 @@ function upsertCommitment(
   return next
 }
 
+function getSubmissionRank(
+  status:
+    Commitment["submissionStatus"]
+): number {
+  switch (status) {
+    case "confirmed":
+      return 4
+
+    case "pending":
+      return 3
+
+    case "failed":
+      return 2
+
+    case "rejected":
+      return 2
+
+    case "prepared":
+      return 1
+
+    default:
+      return 0
+  }
+}
+
+function mergeRecoveredCommitment(
+  existing:
+    Commitment,
+  incoming:
+    Commitment
+): Commitment {
+  /*
+    Same wallet + round should never silently change
+    to a different commitment preimage.
+  */
+
+  if (
+    existing.hash.toLowerCase() !==
+    incoming.hash.toLowerCase()
+  ) {
+    throw new Error(
+      "A different saved commitment already exists for this wallet and round. The existing recovery record was not replaced."
+    )
+  }
+
+  const existingRank =
+    getSubmissionRank(
+      existing.submissionStatus
+    )
+
+  const incomingRank =
+    getSubmissionRank(
+      incoming.submissionStatus
+    )
+
+  const submissionStatus =
+    incomingRank >
+    existingRank
+      ? incoming.submissionStatus
+      : existing.submissionStatus ??
+        incoming.submissionStatus
+
+  /*
+    Preserve the earliest known timestamp.
+  */
+
+  const createdAt =
+    Math.min(
+      existing.createdAt ||
+        incoming.createdAt,
+      incoming.createdAt ||
+        existing.createdAt
+    )
+
+  return {
+    ...incoming,
+
+    createdAt,
+
+    /*
+      Never erase a transaction hash or commitment ID
+      that we already know.
+    */
+
+    txHash:
+      incoming.txHash ||
+      existing.txHash,
+
+    commitmentId:
+      incoming.commitmentId ??
+      existing.commitmentId,
+
+    submissionStatus,
+
+    submissionError:
+      submissionStatus ===
+      "confirmed"
+        ? undefined
+        : incoming.submissionError ??
+          existing.submissionError,
+
+    /*
+      Importing an older backup must not make a
+      revealed/settled record look unfinished again.
+    */
+
+    revealed:
+      Boolean(
+        existing.revealed ||
+        incoming.revealed
+      ),
+
+    valid:
+      incoming.valid ??
+      existing.valid,
+
+    settled:
+      Boolean(
+        existing.settled ||
+        incoming.settled
+      ),
+  }
+}
+
 export default function NtuApp() {
   /*
     ========================================================
@@ -1190,7 +1314,7 @@ export default function NtuApp() {
     wait for confirmation
   */
 
-  const handleCommit =
+    const handleCommit =
     async (
       params: {
         name: string
@@ -1202,10 +1326,10 @@ export default function NtuApp() {
         alert(
           "Connect your wallet before committing a bid."
         )
-
+  
         return
       }
-
+  
       if (
         !networkStatus?.ready
       ) {
@@ -1215,85 +1339,99 @@ export default function NtuApp() {
             "the configured network"
           } before committing a bid.`
         )
-
+  
         return
       }
-
+  
       setCommitting(
         true
       )
-
-      let prepared:
+  
+      /*
+        Always keep track of the NEWEST recovery record.
+  
+        This is important because the old implementation
+        kept pointing to the original "prepared" record.
+      */
+  
+      let latestCommitment:
         Commitment | null =
         null
-
+  
+      let transactionBroadcast =
+        false
+  
       try {
         /*
           Does not open MetaMask.
         */
-
-        const preparedCommitment =
+  
+        const prepared =
           await prepareBidCommitment(
             params
           )
-
-        prepared =
-          preparedCommitment
-
+  
+        latestCommitment =
+          prepared
+  
         /*
           CRITICAL:
-          saved BEFORE requestBidCommitment().
+  
+          Save recovery data BEFORE asking MetaMask
+          for transaction approval.
         */
-
+  
         persistCommitment(
-          preparedCommitment
+          prepared
         )
-
+  
         setCommitments(
           (previous) =>
             upsertCommitment(
               previous,
-              preparedCommitment
+              prepared
             )
         )
-
+  
         /*
           MetaMask opens here.
         */
-
+  
         const submission =
           await requestBidCommitment(
-            preparedCommitment
+            prepared
           )
-
+  
         /*
-          It may already exist on-chain after a reload/retry.
+          A retry may discover that the commitment
+          already exists on-chain.
         */
-
+  
         if (
           submission.alreadyConfirmed
         ) {
           const confirmed:
             Commitment = {
-              ...preparedCommitment,
-
+              ...prepared,
+  
               commitmentId:
                 submission.commitmentId,
-
+  
               txHash:
-                submission.txHash,
-
+                submission.txHash ||
+                prepared.txHash,
+  
               submissionStatus:
                 "confirmed",
-
+  
               submissionError:
                 undefined,
             }
-
+  
           persistCommitment(
             confirmed
           )
-
+  
           setCommitments(
             (previous) =>
               upsertCommitment(
@@ -1301,36 +1439,47 @@ export default function NtuApp() {
                 confirmed
               )
           )
-
+  
           await refreshRound()
-
+  
           return
         }
-
+  
         /*
-          MetaMask approved and transaction was broadcast.
-
-          Save tx hash immediately, before waiting.
+          MetaMask approved and ethers returned a
+          transaction hash.
+  
+          From this point onward, NEVER fall back to the
+          old prepared record.
         */
-
+  
+        transactionBroadcast =
+          true
+  
         const pending:
           Commitment = {
-            ...preparedCommitment,
-
+            ...prepared,
+  
             txHash:
               submission.txHash,
-
+  
             submissionStatus:
               "pending",
-
+  
             submissionError:
               undefined,
           }
-
+  
+  
+        /*
+          Save txHash immediately before waiting for
+          confirmation.
+        */
+  
         persistCommitment(
           pending
         )
-
+  
         setCommitments(
           (previous) =>
             upsertCommitment(
@@ -1338,35 +1487,43 @@ export default function NtuApp() {
               pending
             )
         )
-
+  
         try {
           const confirmation =
             await confirmBidCommitment(
               pending,
               submission.txHash
             )
-
+  
           const confirmed:
             Commitment = {
               ...pending,
-
+  
               commitmentId:
                 confirmation.commitmentId,
-
+  
+              /*
+                Never erase a known txHash.
+              */
+  
               txHash:
-                confirmation.txHash,
-
+                confirmation.txHash ||
+                pending.txHash,
+  
               submissionStatus:
                 "confirmed",
-
+  
               submissionError:
                 undefined,
             }
-
+  
+          latestCommitment =
+            confirmed
+  
           persistCommitment(
             confirmed
           )
-
+  
           setCommitments(
             (previous) =>
               upsertCommitment(
@@ -1374,37 +1531,39 @@ export default function NtuApp() {
                 confirmed
               )
           )
-
+  
           setDomain(
             await checkDomain(
               confirmed.name
             )
           )
-
+  
           await refreshRound()
         } catch (error) {
           /*
-            Preserve all data even when confirmation
-            cannot be observed yet.
+            Confirmation could not be observed.
+  
+            IMPORTANT:
+            preserve the pending transaction hash.
           */
-
+  
           const failed:
             Commitment = {
               ...pending,
-
+  
               submissionStatus:
                 "failed",
-
+  
               submissionError:
                 getFriendlyError(
                   error
                 ),
             }
-
+  
           persistCommitment(
             failed
           )
-
+  
           setCommitments(
             (previous) =>
               upsertCommitment(
@@ -1412,7 +1571,7 @@ export default function NtuApp() {
                 failed
               )
           )
-
+  
           throw error
         }
       } catch (error) {
@@ -1420,36 +1579,44 @@ export default function NtuApp() {
           getFriendlyError(
             error
           )
-
+  
         /*
-          If MetaMask rejected, recovery data already exists.
+          Only classify the record here when a transaction
+          was NOT already broadcast.
+  
+          If it was broadcast, the pending/failed record
+          above is already the newest version and must not
+          be overwritten with "prepared".
         */
-
-        if (prepared) {
+  
+        if (
+          latestCommitment &&
+          !transactionBroadcast
+        ) {
           const rejected =
             message
               .toLowerCase()
               .includes(
                 "cancelled"
               )
-
+  
           const saved:
             Commitment = {
-              ...prepared,
-
+              ...latestCommitment,
+  
               submissionStatus:
                 rejected
                   ? "rejected"
-                  : prepared.submissionStatus,
-
+                  : "failed",
+  
               submissionError:
                 message,
             }
-
+  
           persistCommitment(
             saved
           )
-
+  
           setCommitments(
             (previous) =>
               upsertCommitment(
@@ -1458,8 +1625,10 @@ export default function NtuApp() {
               )
           )
         }
-
-        alert(message)
+  
+        alert(
+          message
+        )
       } finally {
         setCommitting(
           false
@@ -1846,7 +2015,7 @@ export default function NtuApp() {
     ========================================================
   */
 
-  const handleDownloadBackup =
+    const handleDownloadBackup =
     async () => {
       if (
         commitments.length ===
@@ -1855,21 +2024,53 @@ export default function NtuApp() {
         alert(
           "No commitments to back up."
         )
-
+  
         return
       }
-
+  
+      /*
+        Legacy development records may not contain
+        chain/registrar context.
+  
+        Do not let one legacy record prevent every valid
+        modern commitment from being exported.
+      */
+  
+      const exportable =
+        commitments.filter(
+          (commitment) =>
+            Boolean(
+              commitment.chainId &&
+              commitment.registrarAddress
+            )
+        )
+  
+      const skipped =
+        commitments.length -
+        exportable.length
+  
+      if (
+        exportable.length ===
+        0
+      ) {
+        alert(
+          "None of the saved commitments contain enough context to create a safe reveal backup."
+        )
+  
+        return
+      }
+  
       try {
         const backups =
           await Promise.all(
-            commitments.map(
+            exportable.map(
               (commitment) =>
                 createRevealBackup(
                   commitment
                 )
             )
           )
-
+  
         const blob =
           new Blob(
             [
@@ -1884,36 +2085,52 @@ export default function NtuApp() {
                 "application/json",
             }
           )
-
+  
         const url =
           URL.createObjectURL(
             blob
           )
-
+  
         const anchor =
           document.createElement(
             "a"
           )
-
+  
         anchor.href =
           url
-
+  
         anchor.download =
           "ntu-reveal-backup-v1.json"
-
+  
         document.body.appendChild(
           anchor
         )
-
+  
         anchor.click()
-
+  
         document.body.removeChild(
           anchor
         )
-
+  
         URL.revokeObjectURL(
           url
         )
+  
+        if (
+          skipped > 0
+        ) {
+          alert(
+            `Backup created successfully. ${skipped} older legacy record${
+              skipped === 1
+                ? " was"
+                : "s were"
+            } skipped because ${
+              skipped === 1
+                ? "it does"
+                : "they do"
+            } not contain the original chain and registrar context.`
+          )
+        }
       } catch (error) {
         alert(
           getFriendlyError(
@@ -1929,103 +2146,142 @@ export default function NtuApp() {
     ========================================================
   */
 
-  const handleImportBackup =
-    async (
-      file: File
-    ) => {
-      if (!account) {
-        alert(
-          "Connect the wallet that created the commitment before importing a backup."
+const handleImportBackup =
+  async (
+    file: File
+  ) => {
+    if (!account) {
+      alert(
+        "Connect the wallet that created the commitment before importing a backup."
+      )
+
+      return
+    }
+
+    try {
+      const parsed =
+        JSON.parse(
+          await file.text()
         )
 
-        return
-      }
+      const records =
+        Array.isArray(
+          parsed
+        )
+          ? parsed
+          : [parsed]
 
-      try {
-        const parsed =
-          JSON.parse(
-            await file.text()
+      const verified:
+        Commitment[] = []
+
+      /*
+        First verify EVERY incoming backup.
+
+        Nothing is written to localStorage until all
+        backups have passed.
+      */
+
+      for (
+        const raw of records
+      ) {
+        const backup =
+          parseRevealBackup(
+            raw
           )
 
-        const records =
-          Array.isArray(
-            parsed
-          )
-            ? parsed
-            : [parsed]
-
-        const verified:
-          Commitment[] = []
-
-        /*
-          Do not overwrite valid records unless every
-          incoming backup passes validation.
-        */
-
-        for (
-          const raw of records
-        ) {
-          const backup =
-            parseRevealBackup(
-              raw
-            )
-
+        const verification =
           await verifyRevealBackup(
             backup,
             account
           )
 
-          verified.push(
-            backupToCommitment(
-              backup
-            )
-          )
-        }
-
-        /*
-          All records passed.
-        */
-
-        for (
-          const commitment of
-          verified
-        ) {
-          persistCommitment(
-            commitment
-          )
-        }
-
-        setCommitments(
-          (previous) => {
-            let next =
-              previous
-
-            for (
-              const commitment of
-              verified
-            ) {
-              next =
-                upsertCommitment(
-                  next,
-                  commitment
-                )
-            }
-
-            return next
-          }
-        )
-
-        alert(
-          "Reveal backup verified and imported successfully."
-        )
-      } catch (error) {
-        alert(
-          getFriendlyError(
-            error
+        verified.push(
+          backupToCommitment(
+            backup,
+            verification
           )
         )
       }
+
+      /*
+        Merge into a temporary copy first.
+
+        This means a conflict cannot partially overwrite
+        valid recovery data.
+      */
+
+      let mergedRecords =
+        [...commitments]
+
+      const recordsToPersist:
+        Commitment[] = []
+
+      for (
+        const incoming of
+        verified
+      ) {
+        const existing =
+          mergedRecords.find(
+            (record) =>
+              sameCommitmentContext(
+                record,
+                incoming
+              )
+          )
+
+        const merged =
+          existing
+            ? mergeRecoveredCommitment(
+                existing,
+                incoming
+              )
+            : incoming
+
+        mergedRecords =
+          upsertCommitment(
+            mergedRecords,
+            merged
+          )
+
+        recordsToPersist.push(
+          merged
+        )
+      }
+
+      /*
+        All validation and conflict checks succeeded.
+
+        Only now mutate storage.
+      */
+
+      for (
+        const commitment of
+        recordsToPersist
+      ) {
+        persistCommitment(
+          commitment
+        )
+      }
+
+      setCommitments(
+        mergedRecords
+      )
+
+      alert(
+        "Reveal backup verified and imported successfully."
+      )
+    } catch (error) {
+      /*
+        Nothing has been written if validation failed.
+      */
+
+      alert(
+        getFriendlyError(
+          error
+        )
+      )
     }
+  }
 
   /*
     ========================================================
