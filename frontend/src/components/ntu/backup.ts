@@ -4,126 +4,141 @@ import {
     ZeroAddress,
     formatEther,
     isAddress,
+    parseEther,
   } from "ethers"
-  
+
   import {
     computeCommitmentHash,
+    getRegistrarAddress,
+    normalizeLabel,
     validateLabel,
     type Commitment,
+    type CommitmentSubmissionStatus,
   } from "./handlers"
-  
-  declare global {
-    interface Window {
-      ethereum?: any
-    }
-  }
-  
-  const REGISTRAR_ADDRESS =
-    import.meta.env.VITE_REGISTRAR_ADDRESS as string | undefined
-  
+
   const UINT256_MAX =
     (1n << 256n) - 1n
-  
-  /*
-    Only the read methods needed to verify
-    a backup against the deployed registrar.
-  */
+
   const BACKUP_ABI = [
     "function COMMIT_DEPOSIT() view returns (uint256)",
     "function getCommitmentId(uint256 roundId, address bidder) view returns (uint256)",
     "function getCommitment(uint256 commitmentId) view returns (tuple(address bidder, bytes32 digest, uint256 roundId, uint256 deposit, bool revealed, bool valid, bytes32 labelHash, uint256 bidWei, bool settled))",
-    "event CommitmentSubmitted(uint256 indexed commitmentId, uint256 indexed roundId, address indexed bidder, bytes32 digest)",
   ]
 
-  export interface VerifiedRevealBackup {
-    commitmentId: string
-    revealed: boolean
-    valid: boolean
-    settled: boolean
-    committedAt: number | null
-  }
-  
   /*
     ============================================================
-    BACKUP FORMAT REQUIRED BY THE SPEC
+    BACKUP FORMAT
     ============================================================
+
+    The first fields are the required V1 backup fields.
+
+    The fields after commitTxHash are optional recovery metadata.
+    This keeps older V1 backups compatible while allowing newer
+    backups to preserve local UI/recovery state.
   */
-  
+
   export interface RevealBackupV1 {
     schemaVersion: 1
-  
+
     chainId: string
-  
     registrarAddress: string
-  
     bidderAddress: string
-  
     roundId: string
-  
+
     label: string
-  
     bidWei: string
-  
     salt: string
-  
     commitment: string
-  
-    commitTxHash: string | null
+
+    commitTxHash:
+      string | null
+
+    /*
+      Optional recovery metadata.
+
+      Older backups without these fields still work.
+    */
+
+    createdAt?: number
+
+    submissionStatus?:
+      CommitmentSubmissionStatus
+
+    submissionError?: string
+
+    commitmentId?: string
+
+    revealed?: boolean
+    valid?: boolean
+    settled?: boolean
   }
-  
-  /*
-    ============================================================
-    BASIC HELPERS
-    ============================================================
-  */
-  
+
+  export interface BackupVerificationResult {
+    onChainFound: boolean
+
+    commitmentId?:
+      string
+
+    revealed:
+      boolean
+
+    valid?:
+      boolean
+
+    settled:
+      boolean
+  }
+
+  const ALLOWED_STATUSES:
+    CommitmentSubmissionStatus[] = [
+      "prepared",
+      "pending",
+      "confirmed",
+      "rejected",
+      "failed",
+    ]
+
   function requireEthereum() {
     if (!window.ethereum) {
       throw new Error(
         "MetaMask is required to verify this backup."
       )
     }
-  
+
     return window.ethereum
   }
-  
-  function requireRegistrarAddress(): string {
-    if (!REGISTRAR_ADDRESS) {
-      throw new Error(
-        "Registrar contract has not been deployed/configured yet."
-      )
-    }
-  
-    return REGISTRAR_ADDRESS
-  }
-  
+
   function isBytes32(
     value: unknown
   ): value is string {
     return (
-      typeof value === "string" &&
+      typeof value ===
+        "string" &&
       /^0x[0-9a-fA-F]{64}$/.test(
         value
       )
     )
   }
-  
+
   function parseUint256(
     value: unknown,
     field: string
   ): bigint {
     if (
-      typeof value !== "string" ||
-      !/^[0-9]+$/.test(value)
+      typeof value !==
+        "string" ||
+      !/^[0-9]+$/.test(
+        value
+      )
     ) {
       throw new Error(
         `${field} must be a base-10 integer string.`
       )
     }
-  
+
     const parsed =
       BigInt(value)
-  
+
     if (
       parsed < 0n ||
       parsed > UINT256_MAX
@@ -132,35 +147,43 @@ import {
         `${field} is outside the uint256 range.`
       )
     }
-  
+
     return parsed
   }
-  
+
   /*
     ============================================================
     EXPORT
     ============================================================
+
+    Preserve the ORIGINAL commitment context.
+
+    We do not use the wallet's currently selected network here.
   */
-  
+
   export async function createRevealBackup(
-    commitment: Commitment
+    commitment:
+      Commitment
   ): Promise<RevealBackupV1> {
-    const provider =
-      new BrowserProvider(
-        requireEthereum()
+    if (
+      !commitment.chainId
+    ) {
+      throw new Error(
+        "This saved bid does not contain its original chain ID and cannot be safely exported."
       )
-  
-    const network =
-      await provider.getNetwork()
-  
-    /*
-      We use bidWei directly when available.
-  
-      For older records created before this field
-      existed, convert the ETH string exactly once.
-    */
-    let bidWei: string
-  
+    }
+
+    if (
+      !commitment.registrarAddress
+    ) {
+      throw new Error(
+        "This saved bid does not contain its original registrar address and cannot be safely exported."
+      )
+    }
+
+    let bidWei:
+      string
+
     if (
       commitment.bidWei
     ) {
@@ -168,71 +191,97 @@ import {
         commitment.bidWei
     } else {
       /*
-        This fallback exists only for old local records.
-        New commitments should always store bidWei.
+        Legacy compatibility.
+
+        New records always store exact bidWei.
       */
-      const { parseEther } =
-        await import("ethers")
-  
+
       bidWei =
         parseEther(
           commitment.amount
         ).toString()
     }
-  
+
     return {
-      schemaVersion: 1,
-  
+      schemaVersion:
+        1,
+
       chainId:
-        commitment.chainId ?? network.chainId.toString(),
-  
+        commitment.chainId,
+
       registrarAddress:
-        commitment.registrarAddress ?? requireRegistrarAddress(),
-  
+        commitment.registrarAddress,
+
       bidderAddress:
         commitment.bidder,
-  
+
       roundId:
         commitment.roundId,
-  
+
       label:
         commitment.name,
-  
+
       bidWei,
-  
+
       salt:
         commitment.salt,
-  
+
       commitment:
         commitment.hash,
-  
+
       commitTxHash:
         commitment.txHash ||
         null,
+
+      /*
+        Optional recovery metadata.
+      */
+
+      createdAt:
+        commitment.createdAt,
+
+      submissionStatus:
+        commitment.submissionStatus,
+
+      submissionError:
+        commitment.submissionError,
+
+      commitmentId:
+        commitment.commitmentId,
+
+      revealed:
+        commitment.revealed,
+
+      valid:
+        commitment.valid,
+
+      settled:
+        commitment.settled,
     }
   }
-  
+
   /*
     ============================================================
-    JSON SHAPE VALIDATION
+    STRUCTURAL VALIDATION
     ============================================================
   */
-  
+
   export function parseRevealBackup(
     raw: unknown
   ): RevealBackupV1 {
     if (
-      typeof raw !== "object" ||
+      typeof raw !==
+        "object" ||
       raw === null
     ) {
       throw new Error(
         "Backup must contain a JSON object."
       )
     }
-  
+
     const backup =
       raw as Partial<RevealBackupV1>
-  
+
     if (
       backup.schemaVersion !==
       1
@@ -241,49 +290,43 @@ import {
         "Unsupported reveal backup schema version."
       )
     }
-  
+
     const chainId =
       parseUint256(
         backup.chainId,
         "chainId"
       )
-  
-    if (
-      chainId <= 0n
-    ) {
+
+    if (chainId <= 0n) {
       throw new Error(
         "chainId must be greater than zero."
       )
     }
-  
+
     const roundId =
       parseUint256(
         backup.roundId,
         "roundId"
       )
-  
-    if (
-      roundId <= 0n
-    ) {
+
+    if (roundId <= 0n) {
       throw new Error(
         "roundId must be greater than zero."
       )
     }
-  
+
     const bidWei =
       parseUint256(
         backup.bidWei,
         "bidWei"
       )
-  
-    if (
-      bidWei <= 0n
-    ) {
+
+    if (bidWei <= 0n) {
       throw new Error(
         "bidWei must be greater than zero."
       )
     }
-  
+
     if (
       typeof backup.registrarAddress !==
         "string" ||
@@ -297,7 +340,7 @@ import {
         "Backup contains an invalid registrar address."
       )
     }
-  
+
     if (
       typeof backup.bidderAddress !==
         "string" ||
@@ -311,21 +354,41 @@ import {
         "Backup contains an invalid bidder address."
       )
     }
-  
+
     if (
       typeof backup.label !==
-      "string"
+        "string"
     ) {
       throw new Error(
         "Backup label is missing."
       )
     }
-  
+
+    /*
+      Backup labels must already be canonical.
+
+      We do not silently repair malformed imported backups.
+    */
+
+    const canonicalLabel =
+      normalizeLabel(
+        backup.label
+      )
+
+    if (
+      canonicalLabel !==
+      backup.label
+    ) {
+      throw new Error(
+        "Backup label is not in canonical form."
+      )
+    }
+
     const labelValidation =
       validateLabel(
         backup.label
       )
-  
+
     if (
       !labelValidation.valid
     ) {
@@ -334,7 +397,7 @@ import {
           "Backup contains an invalid domain label."
       )
     }
-  
+
     if (
       !isBytes32(
         backup.salt
@@ -344,7 +407,7 @@ import {
         "Backup salt must be a 32-byte hex value."
       )
     }
-  
+
     if (
       !isBytes32(
         backup.commitment
@@ -354,7 +417,7 @@ import {
         "Backup commitment must be a 32-byte hash."
       )
     }
-  
+
     if (
       backup.commitTxHash !==
         null &&
@@ -366,35 +429,138 @@ import {
         "Backup transaction hash is invalid."
       )
     }
-  
-    return backup as RevealBackupV1
+
+    /*
+      Optional recovery fields.
+    */
+
+    if (
+      backup.createdAt !==
+        undefined &&
+      (
+        typeof backup.createdAt !==
+          "number" ||
+        !Number.isFinite(
+          backup.createdAt
+        ) ||
+        !Number.isInteger(
+          backup.createdAt
+        ) ||
+        backup.createdAt <=
+          0
+      )
+    ) {
+      throw new Error(
+        "Backup createdAt value is invalid."
+      )
+    }
+
+    if (
+      backup.submissionStatus !==
+        undefined &&
+      !ALLOWED_STATUSES.includes(
+        backup.submissionStatus
+      )
+    ) {
+      throw new Error(
+        "Backup contains an invalid submission status."
+      )
+    }
+
+    if (
+      backup.submissionError !==
+        undefined &&
+      typeof backup.submissionError !==
+        "string"
+    ) {
+      throw new Error(
+        "Backup contains an invalid submission error."
+      )
+    }
+
+    if (
+      backup.commitmentId !==
+        undefined
+    ) {
+      const commitmentId =
+        parseUint256(
+          backup.commitmentId,
+          "commitmentId"
+        )
+
+      if (
+        commitmentId <= 0n
+      ) {
+        throw new Error(
+          "commitmentId must be greater than zero."
+        )
+      }
+    }
+
+    if (
+      backup.revealed !==
+        undefined &&
+      typeof backup.revealed !==
+        "boolean"
+    ) {
+      throw new Error(
+        "Backup revealed status is invalid."
+      )
+    }
+
+    if (
+      backup.valid !==
+        undefined &&
+      typeof backup.valid !==
+        "boolean"
+    ) {
+      throw new Error(
+        "Backup validity status is invalid."
+      )
+    }
+
+    if (
+      backup.settled !==
+        undefined &&
+      typeof backup.settled !==
+        "boolean"
+    ) {
+      throw new Error(
+        "Backup settlement status is invalid."
+      )
+    }
+
+    return backup as
+      RevealBackupV1
   }
-  
+
   /*
     ============================================================
-    CONTEXT + HASH VERIFICATION
+    IMPORT VERIFICATION
     ============================================================
+
+    Important:
+
+    A backup is allowed to exist BEFORE an on-chain transaction.
+
+    Therefore a valid prepared/rejected backup must not be rejected
+    merely because getCommitmentId() returns zero.
   */
-  
+
   export async function verifyRevealBackup(
-    backup: RevealBackupV1,
-    connectedAccount: string
-  ): Promise<VerifiedRevealBackup> {
+    backup:
+      RevealBackupV1,
+    connectedAccount:
+      string
+  ): Promise<BackupVerificationResult> {
     const provider =
       new BrowserProvider(
         requireEthereum()
       )
-  
+
     const network =
       await provider.getNetwork()
-  
-    const configuredRegistrar =
-      requireRegistrarAddress()
-  
-    /*
-      1. Chain check
-    */
-  
+
     if (
       network.chainId.toString() !==
       backup.chainId
@@ -403,24 +569,16 @@ import {
         `This backup belongs to chain ${backup.chainId}, but MetaMask is connected to chain ${network.chainId.toString()}.`
       )
     }
-  
-    /*
-      2. Contract check
-    */
-  
+
     if (
-      configuredRegistrar.toLowerCase() !==
+      getRegistrarAddress().toLowerCase() !==
       backup.registrarAddress.toLowerCase()
     ) {
       throw new Error(
         "This backup belongs to a different registrar deployment."
       )
     }
-  
-    /*
-      3. Wallet check
-    */
-  
+
     if (
       connectedAccount.toLowerCase() !==
       backup.bidderAddress.toLowerCase()
@@ -429,37 +587,41 @@ import {
         "Switch to the wallet that created this commitment before importing it."
       )
     }
-  
+
     const roundId =
       BigInt(
         backup.roundId
       )
-  
+
     const bidWei =
       BigInt(
         backup.bidWei
       )
-  
-    /*
-      4. Recompute commitment locally
-    */
-  
+
     const recomputed =
       await computeCommitmentHash({
+        chainId:
+          BigInt(
+            backup.chainId
+          ),
+
+        registrarAddress:
+          backup.registrarAddress,
+
         roundId,
-  
+
         bidder:
           backup.bidderAddress,
-  
+
         label:
           backup.label,
-  
+
         bidWei,
-  
+
         salt:
           backup.salt,
       })
-  
+
     if (
       recomputed.toLowerCase() !==
       backup.commitment.toLowerCase()
@@ -468,191 +630,239 @@ import {
         "Backup verification failed: the label, bid, salt or context does not reproduce the saved commitment."
       )
     }
-  
-    /*
-      5. Check bid against the configured deposit limit.
-    */
-  
+
     const contract =
       new Contract(
-        configuredRegistrar,
+        backup.registrarAddress,
         BACKUP_ABI,
         provider
       )
-  
+
     const deposit:
       bigint =
       await contract.COMMIT_DEPOSIT()
-  
+
     if (
-      bidWei >
-      deposit
+      bidWei > deposit
     ) {
       throw new Error(
         "Backup bid exceeds the registrar's maximum allowed bid."
       )
     }
-  
-    /*
-      6. Verify the actual commitment stored on-chain
-         for this wallet and round.
-    */
-  
+
     const commitmentId:
       bigint =
       await contract.getCommitmentId(
         roundId,
         backup.bidderAddress
       )
-  
+
+    /*
+      No on-chain commitment.
+
+      This is still valid recovery data if:
+      - MetaMask was rejected
+      - approval was never requested
+      - the transaction is pending/not yet observable
+    */
+
     if (
-      commitmentId ===
-      0n
+      commitmentId === 0n
     ) {
-      throw new Error(
-        "No on-chain commitment exists for this wallet and round."
-      )
+      return {
+        onChainFound:
+          false,
+
+        revealed:
+          backup.revealed ??
+          false,
+
+        valid:
+          backup.valid,
+
+        settled:
+          backup.settled ??
+          false,
+      }
     }
-  
+
     const stored =
       await contract.getCommitment(
         commitmentId
       )
-  
+
     if (
       stored.digest.toLowerCase() !==
-        backup.commitment.toLowerCase() ||
-      stored.bidder.toLowerCase() !==
-        backup.bidderAddress.toLowerCase() ||
-      stored.roundId !== roundId
+      backup.commitment.toLowerCase()
     ) {
       throw new Error(
         "The backup commitment does not match the commitment recorded on-chain."
       )
     }
 
-    let committedAt: number | null = null
+    /*
+      Once an on-chain record exists, chain state is the
+      source of truth for reveal/settlement status.
+    */
 
-    if (backup.commitTxHash) {
-      try {
-        const receipt =
-          await provider.getTransactionReceipt(
-            backup.commitTxHash
-          )
+    return {
+      onChainFound:
+        true,
 
-        if (
-          receipt &&
-          receipt.from.toLowerCase() ===
-            backup.bidderAddress.toLowerCase() &&
-          receipt.to?.toLowerCase() ===
-            configuredRegistrar.toLowerCase()
-        ) {
-          const matchingEvent =
-            receipt.logs.some((log) => {
-              if (
-                log.address.toLowerCase() !==
-                configuredRegistrar.toLowerCase()
-              ) {
-                return false
-              }
+      commitmentId:
+        commitmentId.toString(),
 
-              const event =
-                contract.interface.parseLog(log)
+      revealed:
+        Boolean(
+          stored.revealed
+        ),
 
-              return (
-                event?.name === "CommitmentSubmitted" &&
-                event.args.commitmentId === commitmentId &&
-                event.args.roundId === roundId &&
-                event.args.bidder.toLowerCase() ===
-                  backup.bidderAddress.toLowerCase() &&
-                event.args.digest.toLowerCase() ===
-                  backup.commitment.toLowerCase()
-              )
-            })
+      valid:
+        Boolean(
+          stored.valid
+        ),
 
-          if (matchingEvent) {
-            const block =
-              await provider.getBlock(
-                receipt.blockNumber
-              )
+      settled:
+        Boolean(
+          stored.settled
+        ),
+    }
+  }
 
-            if (block) {
-              committedAt =
-                block.timestamp * 1000
-            }
-          }
-        }
-      } catch {
-        // Historical transaction details are optional; the on-chain
-        // commitment above is the authority for recovery.
+  /*
+    ============================================================
+    BACKUP → UI RECORD
+    ============================================================
+  */
+
+  export function backupToCommitment(
+    backup:
+      RevealBackupV1,
+    verification?:
+      BackupVerificationResult
+  ): Commitment {
+    let submissionStatus:
+      CommitmentSubmissionStatus
+
+    /*
+      Chain record found = definitely confirmed.
+    */
+
+    if (
+      verification?.onChainFound
+    ) {
+      submissionStatus =
+        "confirmed"
+    } else if (
+      backup.commitTxHash
+    ) {
+      /*
+        A tx hash exists, but no on-chain commitment was
+        found yet.
+
+        Preserve a known failed status. Otherwise treat the
+        transaction as pending rather than falsely confirmed.
+      */
+
+      submissionStatus =
+        backup.submissionStatus ===
+        "failed"
+          ? "failed"
+          : "pending"
+    } else {
+      /*
+        No transaction hash.
+
+        Prepared, rejected and failed records are all valid
+        local recovery states.
+      */
+
+      if (
+        backup.submissionStatus ===
+          "rejected" ||
+        backup.submissionStatus ===
+          "failed"
+      ) {
+        submissionStatus =
+          backup.submissionStatus
+      } else {
+        submissionStatus =
+          "prepared"
       }
     }
 
     return {
-      commitmentId: commitmentId.toString(),
-      revealed: stored.revealed,
-      valid: stored.valid,
-      settled: stored.settled,
-      committedAt,
-    }
-  }
-  
-  /*
-    ============================================================
-    CONVERT VERIFIED BACKUP BACK INTO UI RECORD
-    ============================================================
-  */
-  
-  export function backupToCommitment(
-    backup: RevealBackupV1,
-    verified: VerifiedRevealBackup
-  ): Commitment {
-    return {
-      commitmentId:
-        verified.commitmentId,
+      chainId:
+        backup.chainId,
 
-      chainId: backup.chainId,
-      registrarAddress: backup.registrarAddress,
+      registrarAddress:
+        backup.registrarAddress,
 
       roundId:
         backup.roundId,
-  
+
       bidder:
         backup.bidderAddress,
-  
+
       name:
         backup.label,
-  
+
       amount:
         formatEther(
           BigInt(
             backup.bidWei
           )
         ),
-  
+
       bidWei:
         backup.bidWei,
-  
+
       salt:
         backup.salt,
-  
+
       hash:
         backup.commitment,
-  
+
       txHash:
         backup.commitTxHash ??
         "",
-  
+
+      commitmentId:
+        verification?.commitmentId ??
+        backup.commitmentId,
+
+      /*
+        Preserve the original local timestamp where available.
+        Old V1 backups without it remain compatible.
+      */
+
       createdAt:
-        verified.committedAt ?? 0,
-  
+        backup.createdAt ??
+        Date.now(),
+
+      submissionStatus,
+
+      submissionError:
+        submissionStatus ===
+        "confirmed"
+          ? undefined
+          : backup.submissionError,
+
       revealed:
-        verified.revealed,
+        verification?.onChainFound
+          ? verification.revealed
+          : backup.revealed ??
+            false,
 
       valid:
-        verified.valid,
-  
+        verification?.onChainFound
+          ? verification.valid
+          : backup.valid,
+
       settled:
-        verified.settled,
+        verification?.onChainFound
+          ? verification.settled
+          : backup.settled ??
+            false,
     }
   }

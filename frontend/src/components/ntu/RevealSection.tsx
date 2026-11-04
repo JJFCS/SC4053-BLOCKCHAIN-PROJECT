@@ -38,7 +38,7 @@ export function RevealSection({
   onDownloadBackup: () => void
   onImportBackup: (file: File) => void
 }) {
-  const [now, setNow] = useState(Date.now())
+  const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     if (!domain?.phaseEndsAt) return
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
@@ -134,7 +134,7 @@ export function RevealSection({
                     settled={
                       !!c.settled
                     }
-                    submissionStatus={c.submissionFailed ? "failed" : c.commitmentId ? "confirmed" : c.txHash ? "submitted" : "prepared"}
+                    submissionStatus={c.submissionStatus ?? (c.commitmentId ? "confirmed" : c.txHash ? "pending" : "prepared")}
                     valid={
                       c.valid
                     }
@@ -234,8 +234,8 @@ export function RevealSection({
                       disabled={
                         !inReveal ||
                         !correctWallet ||
-                        (!c.txHash && !c.commitmentId) ||
-                        !!c.submissionFailed
+                        !c.commitmentId ||
+                        c.submissionStatus === "failed"
                       }
                       loading={
                         revealingHash ===
@@ -245,14 +245,16 @@ export function RevealSection({
                         onReveal(c)
                       }
                     >
-                      {c.submissionFailed
+                      {c.submissionStatus === "failed"
                         ? "Commit failed; no on-chain bid"
+                        : c.submissionStatus === "rejected"
+                          ? "Commit request rejected"
                         : !account
                         ? "Connect wallet to reveal"
                         : !correctWallet
                           ? "Switch to original wallet"
-                          : !c.txHash && !c.commitmentId
-                            ? "Not submitted; commit during a round"
+                        : !c.commitmentId
+                            ? c.txHash ? "Checking chain confirmation" : "Not submitted; commit during a round"
                           : domain?.name === c.name && domain.status === "reveal" &&
                             phaseRemainingMs(domain.phaseEndsAt, domain.chainClock, now) === 0
                             ? "Reveal window elapsed; refresh"
@@ -285,7 +287,7 @@ function CommitmentBadge({
 }: {
   revealed: boolean
   settled: boolean
-  submissionStatus: "prepared" | "submitted" | "confirmed" | "failed"
+  submissionStatus: Commitment["submissionStatus"]
   valid?: boolean
   ready: boolean
 }) {
@@ -293,11 +295,15 @@ function CommitmentBadge({
     return <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs text-red-800">Commit failed</span>
   }
 
+  if (submissionStatus === "rejected") {
+    return <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs text-amber-800">Commit request rejected</span>
+  }
+
   if (submissionStatus === "prepared") {
     return <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs text-amber-800">Prepared, not submitted</span>
   }
 
-  if (submissionStatus === "submitted") {
+  if (submissionStatus === "pending") {
     return <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs text-blue-800">Submitted, checking chain</span>
   }
 

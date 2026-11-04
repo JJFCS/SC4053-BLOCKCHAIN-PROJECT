@@ -9,21 +9,42 @@ import {
   parseEther,
 } from "ethers"
 
-/*
-  ============================================================
-  METAMASK
-  ============================================================
-*/
+interface MetaMaskProvider {
+  request(args: {
+    method: string
+    params?: unknown[] | Record<string, unknown>
+  }): Promise<unknown>
+
+  on(
+    event: "accountsChanged",
+    listener: (accounts: string[]) => void
+  ): void
+
+  on(
+    event: "chainChanged",
+    listener: (chainId: string) => void
+  ): void
+
+  removeListener(
+    event: "accountsChanged",
+    listener: (accounts: string[]) => void
+  ): void
+
+  removeListener(
+    event: "chainChanged",
+    listener: (chainId: string) => void
+  ): void
+}
 
 declare global {
   interface Window {
-    ethereum?: any
+    ethereum?: MetaMaskProvider
   }
 }
 
 /*
   ============================================================
-  CONTRACT CONFIGURATION
+  CONFIGURATION
   ============================================================
 */
 
@@ -32,113 +53,58 @@ const REGISTRAR_ADDRESS =
     | string
     | undefined
 
-const EXPECTED_CHAIN_ID =
+const CONFIGURED_CHAIN_ID =
   import.meta.env.VITE_CHAIN_ID as
     | string
     | undefined
 
 /*
-  ABI matching the final DomainRegistrar.sol.
-
-  We include only the functions/events used by the frontend.
+  ============================================================
+  CONTRACT ABI
+  ============================================================
 */
 
 const REGISTRAR_ABI = [
-  /*
-    ROUND MANAGEMENT
-  */
   "function startRound() returns (uint256 roundId)",
-
   "function getCurrentRound() view returns (uint256)",
-
   "function getRound(uint256 roundId) view returns (tuple(uint256 startTime, uint256 commitEnd, uint256 revealEnd, uint8 phase, uint256 pendingDomainCount, uint256 deposit, uint256 nonRevealPenalty, address treasury))",
 
-  /*
-    CONFIGURATION
-  */
   "function COMMIT_DEPOSIT() view returns (uint256)",
-
   "function NON_REVEAL_PENALTY() view returns (uint256)",
 
-  /*
-    COMMIT
-  */
   "function commitBid(uint256 roundId, bytes32 digest) payable",
-
-  /*
-    REVEAL
-  */
   "function revealBid(uint256 roundId, string label, uint256 bidWei, bytes32 salt)",
 
-  /*
-    COMMITMENT LOOKUP
-  */
   "function getCommitment(uint256 commitmentId) view returns (tuple(address bidder, bytes32 digest, uint256 roundId, uint256 deposit, bool revealed, bool valid, bytes32 labelHash, uint256 bidWei, bool settled))",
-
   "function getCommitmentId(uint256 roundId, address bidder) view returns (uint256)",
-
   "function getCommitmentForRound(uint256 roundId, address bidder) view returns (tuple(address bidder, bytes32 digest, uint256 roundId, uint256 deposit, bool revealed, bool valid, bytes32 labelHash, uint256 bidWei, bool settled))",
 
-  /*
-    AUCTION
-  */
   "function getAuction(string label) view returns (tuple(uint256 roundId, uint256 winningCommitmentId, address highestBidder, uint256 highestBidWei, bool finalized))",
-
   "function getAuctionForRound(uint256 roundId, string label) view returns (tuple(uint256 roundId, uint256 winningCommitmentId, address highestBidder, uint256 highestBidWei, bool finalized))",
-
   "function reservedRound(string label) view returns (uint256)",
 
-  /*
-    DOMAIN
-  */
   "function finalizeName(string label) returns (address owner)",
-
   "function finalizeDomain(uint256 roundId, string label) returns (address owner)",
 
   "function getDomain(string label) view returns (tuple(address owner, uint256 roundId, uint256 winningCommitmentId, uint256 priceWei, address resolutionAddress))",
-
   "function ownerOf(string label) view returns (address)",
-
-  /*
-    RESOLUTION
-  */
   "function resolve(string label) view returns (address)",
-
   "function setAddress(string label, address target)",
 
-  /*
-    SETTLEMENT
-  */
   "function settleBid(uint256 roundId)",
-
   "function settleCommit(uint256 commitmentId) returns (uint256 refundWei, uint256 proceedsWei)",
-
   "function withdrawalCredits(address account) view returns (uint256)",
-
   "function withdraw()",
 
-  /*
-    PAYMENT
-  */
   "function sendToDomain(string label, address expectedRecipient) payable",
 
-  /*
-    EVENTS
-  */
   "event RoundStarted(uint256 indexed roundId, address indexed starter, uint256 startTime, uint256 commitEnd, uint256 revealEnd)",
-
   "event CommitmentSubmitted(uint256 indexed commitmentId, uint256 indexed roundId, address indexed bidder, bytes32 digest)",
-
   "event CommitmentRevealed(uint256 indexed commitmentId, uint256 indexed roundId, address indexed bidder, string label, uint256 bidWei, bool valid)",
-
   "event DomainFinalized(bytes32 indexed labelHash, uint256 indexed roundId, address indexed owner, string label, uint256 winningCommitmentId, uint256 priceWei)",
-
   "event CommitmentSettled(uint256 indexed commitmentId, uint256 indexed roundId, address indexed bidder, uint256 refundWei, uint256 proceedsWei)",
-
   "event Withdrawn(address indexed account, uint256 amountWei)",
-
   "event AddressUpdated(bytes32 indexed labelHash, address indexed owner, address indexed target, string label)",
-
   "event DomainPayment(bytes32 indexed labelHash, address indexed sender, address indexed recipient, string label, uint256 amountWei)",
 ]
 
@@ -166,148 +132,95 @@ export interface ChainClock {
   capturedAtMs: number
 }
 
+export type CommitmentSubmissionStatus =
+  | "prepared"
+  | "pending"
+  | "confirmed"
+  | "rejected"
+  | "failed"
+
 export interface DomainInfo {
   name: string
-
   status: DomainStatus
-
   roundId?: string
-
   phaseEndsAt?: number
-
   chainClock?: ChainClock
-
   owner?: string
-
   resolutionAddress?: string
-
   highestBid?: string
-
   highestBidder?: string
-
   winningCommitmentId?: string
-
   priceWei?: string
-
   finalized?: boolean
-
   reservedRoundId?: string
 }
 
 export interface Commitment {
-  /*
-    On-chain commitment sequence ID.
-
-    Optional because imported/legacy records may not
-    initially contain it.
-  */
   commitmentId?: string
 
-  // Recorded at preparation time so switching chains cannot relabel a backup.
   chainId?: string
   registrarAddress?: string
 
-  /*
-    uint256 values are stored as decimal strings.
-  */
   roundId: string
-
   bidder: string
-
-  /*
-    Canonical label WITHOUT .ntu.
-  */
   name: string
 
-  /*
-    Human-readable amount for the UI.
-    Example: "0.030000000000000001"
-  */
   amount: string
-
-  /*
-    Exact amount used in commitment/reveal.
-
-    Example:
-    "30000000000000001"
-
-    Never store this as a JS number.
-  */
   bidWei: string
 
   salt: string
-
   hash: string
 
   txHash: string
 
-  // A mined, reverted commit has a transaction hash but no on-chain bid.
-  submissionFailed?: boolean
-
   createdAt: number
 
+  submissionStatus?: CommitmentSubmissionStatus
+  submissionError?: string
+
   revealed: boolean
-
   valid?: boolean
-
   settled?: boolean
-}
-
-export async function reconcileSubmittedCommitment(record: Commitment): Promise<Commitment> {
-  if (!record.txHash || record.commitmentId || record.submissionFailed) return record
-  if (record.chainId !== getExpectedChainId().toString() ||
-      record.registrarAddress?.toLowerCase() !== getRegistrarAddress().toLowerCase()) return record
-
-  const contract = await getReadContract()
-  const receipt = await getProvider().getTransactionReceipt(record.txHash)
-  if (!receipt) return record
-
-  if (receipt.status !== 1 ||
-      receipt.from.toLowerCase() !== record.bidder.toLowerCase() ||
-      receipt.to?.toLowerCase() !== getRegistrarAddress().toLowerCase()) {
-    return { ...record, submissionFailed: true }
-  }
-
-  const commitmentId: bigint = await contract.getCommitmentId(BigInt(record.roundId), record.bidder)
-  if (commitmentId === 0n) return { ...record, submissionFailed: true }
-
-  const stored = await contract.getCommitment(commitmentId)
-  if (stored.digest.toLowerCase() !== record.hash.toLowerCase() ||
-      stored.bidder.toLowerCase() !== record.bidder.toLowerCase() ||
-      stored.roundId !== BigInt(record.roundId)) {
-    return { ...record, submissionFailed: true }
-  }
-
-  return { ...record, commitmentId: commitmentId.toString(), submissionFailed: false }
 }
 
 export interface RoundState {
   roundId: string
-
   startTime: number
-
   commitEnd: number
-
   revealEnd: number
-
   phase: RoundPhase
-
   phaseEndsAt?: number
-
   chainClock?: ChainClock
-
   pendingDomainCount: string
-
   deposit: string
-
   nonRevealPenalty: string
-
   treasury: string
+}
+
+export interface NetworkStatus {
+  chainId: string
+  networkName: string
+  expectedChainId: string
+  expectedNetworkName: string
+  correctNetwork: boolean
+  registrarConfigured: boolean
+  registrarExists: boolean
+  ready: boolean
+}
+
+export interface PaymentPreview {
+  name: string
+  amount: string
+  amountWei: string
+  recipient: string
+  chainId: string
+  networkName: string
+  createdAt: number
 }
 
 /*
   ============================================================
-  LABEL NORMALISATION
+  LABEL HELPERS
   ============================================================
 */
 
@@ -317,48 +230,14 @@ export function normalizeLabel(
   return value
     .trim()
     .toLowerCase()
-    .replace(
-      /\.ntu$/,
-      ""
-    )
+    .replace(/\.ntu$/, "")
 }
-
-/*
-  Used by input fields while typing.
-
-  Invalid characters are removed for convenience.
-*/
 
 export function sanitizeLabel(
   value: string
 ): string {
-  return normalizeLabel(
-    value
-  )
-    .replace(
-      /[^a-z0-9-]/g,
-      ""
-    )
-    .slice(
-      0,
-      32
-    )
+  return normalizeLabel(value)
 }
-
-/*
-  ============================================================
-  LABEL VALIDATION
-  ============================================================
-
-  Final specification / contract:
-
-  - 3–32 ASCII bytes
-  - lowercase a-z
-  - digits 0-9
-  - hyphens allowed
-  - cannot begin with "-"
-  - cannot end with "-"
-*/
 
 export function validateLabel(
   value: string
@@ -367,34 +246,24 @@ export function validateLabel(
   error?: string
 } {
   const label =
-    normalizeLabel(
-      value
-    )
+    normalizeLabel(value)
 
   const byteLength =
-    new TextEncoder()
-      .encode(
-        label
-      )
-      .length
+    new TextEncoder().encode(
+      label
+    ).length
 
-  if (
-    byteLength < 3
-  ) {
+  if (byteLength < 3) {
     return {
       valid: false,
-
       error:
         "Domain names must be at least 3 characters long.",
     }
   }
 
-  if (
-    byteLength > 32
-  ) {
+  if (byteLength > 32) {
     return {
       valid: false,
-
       error:
         "Domain names cannot exceed 32 characters.",
     }
@@ -406,20 +275,16 @@ export function validateLabel(
   ) {
     return {
       valid: false,
-
       error:
         "Domain names cannot start or end with a hyphen.",
     }
   }
 
   if (
-    !/^[a-z0-9-]+$/.test(
-      label
-    )
+    !/^[a-z0-9-]+$/.test(label)
   ) {
     return {
       valid: false,
-
       error:
         "Use lowercase letters, numbers and hyphens only.",
     }
@@ -444,17 +309,11 @@ export function generateSalt(): string {
 
   return (
     "0x" +
-    Array.from(
-      bytes
-    )
-      .map(
-        (byte) =>
-          byte
-            .toString(16)
-            .padStart(
-              2,
-              "0"
-            )
+    Array.from(bytes)
+      .map((byte) =>
+        byte
+          .toString(16)
+          .padStart(2, "0")
       )
       .join("")
   )
@@ -462,14 +321,12 @@ export function generateSalt(): string {
 
 /*
   ============================================================
-  BASIC REQUIREMENTS
+  CONFIG / METAMASK
   ============================================================
 */
 
 function requireMetaMask() {
-  if (
-    !window.ethereum
-  ) {
+  if (!window.ethereum) {
     throw new Error(
       "MetaMask is not installed. Please install MetaMask first."
     )
@@ -478,10 +335,9 @@ function requireMetaMask() {
   return window.ethereum
 }
 
-export function getRegistrarAddress(): string {
-  if (
-    !REGISTRAR_ADDRESS
-  ) {
+export function getRegistrarAddress():
+string {
+  if (!REGISTRAR_ADDRESS) {
     throw new Error(
       "Registrar contract has not been deployed/configured yet."
     )
@@ -490,33 +346,210 @@ export function getRegistrarAddress(): string {
   return REGISTRAR_ADDRESS
 }
 
-export function getExpectedChainId(): bigint {
-  if (!EXPECTED_CHAIN_ID || !/^[0-9]+$/.test(EXPECTED_CHAIN_ID)) {
-    throw new Error("Configure VITE_CHAIN_ID for the registrar deployment.")
-  }
-
-  return BigInt(EXPECTED_CHAIN_ID)
-}
-
-async function assertConfiguredNetwork(provider: BrowserProvider): Promise<void> {
-  const expected = getExpectedChainId()
-  const actual = (await provider.getNetwork()).chainId
-
-  if (actual !== expected) {
+export function getConfiguredChainId():
+bigint {
+  if (!CONFIGURED_CHAIN_ID) {
     throw new Error(
-      `Wrong network: wallet chain ${actual}, registrar chain ${expected}. Switch the site's MetaMask network to chain ${expected}.`
+      "Frontend network has not been configured."
     )
   }
 
-  const code = await provider.getCode(getRegistrarAddress())
-  if (code === "0x") {
-    throw new Error("No registrar contract exists at the configured address on this chain. Redeploy and update the frontend configuration.")
+  try {
+    return BigInt(
+      CONFIGURED_CHAIN_ID
+    )
+  } catch {
+    throw new Error(
+      "VITE_CHAIN_ID is invalid."
+    )
   }
 }
 
 /*
   ============================================================
-  ERROR MESSAGES
+  NETWORK
+  ============================================================
+*/
+
+function getNetworkName(
+  chainId: bigint,
+  providerName?: string
+): string {
+  if (chainId === 1n) {
+    return "Ethereum Mainnet"
+  }
+
+  if (chainId === 11155111n) {
+    return "Sepolia"
+  }
+
+  if (chainId === 17000n) {
+    return "Holesky"
+  }
+
+  if (chainId === 31337n) {
+    return "Hardhat Local"
+  }
+
+  if (
+    providerName &&
+    providerName !== "unknown"
+  ) {
+    return providerName
+  }
+
+  return `Chain ${chainId.toString()}`
+}
+
+export function getConfiguredNetworkName():
+string {
+  return getNetworkName(
+    getConfiguredChainId()
+  )
+}
+
+export function getProvider() {
+  return new BrowserProvider(
+    requireMetaMask()
+  )
+}
+
+export async function getNetworkStatus():
+Promise<NetworkStatus> {
+  const provider =
+    getProvider()
+
+  const network =
+    await provider.getNetwork()
+
+  const expectedChainId =
+    getConfiguredChainId()
+
+  const correctNetwork =
+    network.chainId ===
+    expectedChainId
+
+  const registrarConfigured =
+    Boolean(REGISTRAR_ADDRESS)
+
+  let registrarExists =
+    false
+
+  if (
+    correctNetwork &&
+    registrarConfigured
+  ) {
+    try {
+      const code =
+        await provider.getCode(
+          getRegistrarAddress()
+        )
+
+      registrarExists =
+        code !== "0x"
+    } catch {
+      registrarExists =
+        false
+    }
+  }
+
+  return {
+    chainId:
+      network.chainId.toString(),
+
+    networkName:
+      getNetworkName(
+        network.chainId,
+        network.name
+      ),
+
+    expectedChainId:
+      expectedChainId.toString(),
+
+    expectedNetworkName:
+      getNetworkName(
+        expectedChainId
+      ),
+
+    correctNetwork,
+    registrarConfigured,
+    registrarExists,
+
+    ready:
+      correctNetwork &&
+      registrarConfigured &&
+      registrarExists,
+  }
+}
+
+export async function switchToConfiguredNetwork():
+Promise<void> {
+  const ethereum =
+    requireMetaMask()
+
+  const chainId =
+    getConfiguredChainId()
+
+  try {
+    await ethereum.request({
+      method:
+        "wallet_switchEthereumChain",
+
+      params: [
+        {
+          chainId:
+            `0x${chainId.toString(
+              16
+            )}`,
+        },
+      ],
+    })
+  } catch (error) {
+    const code =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined
+
+    if (code === 4902) {
+      throw new Error(
+        `${getConfiguredNetworkName()} is not available in MetaMask. Enable the network in MetaMask and try again.`,
+        { cause: error }
+      )
+    }
+
+    throw error
+  }
+}
+
+async function requireReadyNetwork():
+Promise<void> {
+  const status =
+    await getNetworkStatus()
+
+  if (!status.correctNetwork) {
+    throw new Error(
+      `Wrong network. MetaMask is connected to ${status.networkName}. Switch to ${status.expectedNetworkName} before continuing.`
+    )
+  }
+
+  if (!status.registrarConfigured) {
+    throw new Error(
+      "Registrar contract has not been configured."
+    )
+  }
+
+  if (!status.registrarExists) {
+    throw new Error(
+      "No registrar contract was found at the configured address on this network."
+    )
+  }
+}
+
+/*
+  ============================================================
+  FRIENDLY ERRORS
   ============================================================
 */
 
@@ -529,111 +562,102 @@ export function getFriendlyError(
       : String(error)
 
   const messages:
-    Record<
-      string,
-      string
-    > = {
-    "WRONG ROUND":
-      "This auction round is no longer the current round.",
+    Record<string, string> = {
+      "WRONG ROUND":
+        "This auction round is no longer the current round.",
 
-    "ROUND NOT ENDED":
-      "The auction round has not ended yet.",
+      "ROUND NOT ENDED":
+        "The auction round has not ended yet.",
 
-    "NOT COMMIT PHASE":
-      "Bids can only be committed during the commit phase.",
+      "NOT COMMIT PHASE":
+        "Bids can only be committed during the commit phase.",
 
-    "NOT REVEAL PHASE":
-      "Bids can only be revealed during the reveal phase.",
+      "NOT REVEAL PHASE":
+        "Bids can only be revealed during the reveal phase.",
 
-    "INCORRECT DEPOSIT":
-      "The transaction used the wrong commitment deposit.",
+      "INCORRECT DEPOSIT":
+        "The transaction used the wrong commitment deposit.",
 
-    "EMPTY COMMITMENT":
-      "The commitment hash cannot be empty.",
+      "EMPTY COMMITMENT":
+        "The commitment hash cannot be empty.",
 
-    "ALREADY COMMITTED":
-      "This wallet has already committed a bid in this round.",
+      "ALREADY COMMITTED":
+        "This wallet has already committed a bid in this round.",
 
-    "NO COMMITMENT":
-      "No commitment was found for this wallet in this round.",
+      "NO COMMITMENT":
+        "No commitment was found for this wallet in this round.",
 
-    "INVALID COMMITMENT":
-      "The commitment could not be found.",
+      "INVALID COMMITMENT":
+        "The commitment could not be found.",
 
-    "NOT BIDDER":
-      "Only the wallet that created this commitment can perform this action.",
+      "NOT BIDDER":
+        "Only the wallet that created this commitment can perform this action.",
 
-    "ALREADY REVEALED":
-      "This commitment has already been revealed.",
+      "ALREADY REVEALED":
+        "This commitment has already been revealed.",
 
-    "INVALID LABEL":
-      "This .ntu name is invalid.",
+      "INVALID LABEL":
+        "This .ntu name is invalid.",
 
-    "INVALID BID":
-      "The revealed bid is outside the allowed range.",
+      "INVALID BID":
+        "The revealed bid is outside the allowed range.",
 
-    "ALREADY REGISTERED":
-      "This .ntu name has already been registered.",
+      "ALREADY REGISTERED":
+        "This .ntu name has already been registered.",
 
-    "NAME RESERVED":
-      "This .ntu name is reserved by another auction round.",
+      "NAME RESERVED":
+        "This .ntu name is reserved by another auction round.",
 
-    "COMMITMENT MISMATCH":
-      "The name, bid, salt or context does not match the original commitment.",
+      "COMMITMENT MISMATCH":
+        "The name, bid, salt or context does not match the original commitment.",
 
-    "NO WINNING BID":
-      "There is no winning bid for this name.",
+      "NO WINNING BID":
+        "There is no winning bid for this name.",
 
-    "ALREADY FINALIZED":
-      "This domain has already been finalized.",
+      "ALREADY FINALIZED":
+        "This domain has already been finalized.",
 
-    "WRONG RESERVATION":
-      "This name belongs to a different auction round.",
+      "WRONG RESERVATION":
+        "This name belongs to a different auction round.",
 
-    "DOMAIN NOT FINALIZED":
-      "This domain must be finalized before this revealed bid can be settled.",
+      "DOMAIN NOT FINALIZED":
+        "This domain must be finalized before this revealed bid can be settled.",
 
-    "ALREADY SETTLED":
-      "This commitment has already been settled.",
+      "ALREADY SETTLED":
+        "This commitment has already been settled.",
 
-    "NO CREDIT":
-      "There is no ETH available to withdraw.",
+      "NO CREDIT":
+        "There is no ETH available to withdraw.",
 
-    "NOT OWNER":
-      "Only the domain owner can change its resolution address.",
+      "NOT OWNER":
+        "Only the domain owner can change its resolution address.",
 
-    "UNREGISTERED NAME":
-      "This .ntu name has not been registered.",
+      "UNREGISTERED NAME":
+        "This .ntu name has not been registered.",
 
-    "ZERO ADDRESS":
-      "The zero address cannot be used here.",
+      "ZERO ADDRESS":
+        "The zero address cannot be used here.",
 
-    "INVALID TARGET":
-      "This address cannot be used as the resolution target.",
+      "INVALID TARGET":
+        "This address cannot be used as the resolution target.",
 
-    "ZERO PAYMENT":
-      "Payment amount must be greater than zero.",
+      "ZERO PAYMENT":
+        "Payment amount must be greater than zero.",
 
-    "RECIPIENT CHANGED":
-      "The domain's resolution address changed before the payment was confirmed. Please review the new recipient before trying again.",
+      "RECIPIENT CHANGED":
+        "The domain's resolution address changed before the payment was confirmed. Please review the new recipient before trying again.",
 
-    "ETH TRANSFER FAILED":
-      "The ETH transfer failed.",
-  }
+      "ETH TRANSFER FAILED":
+        "The ETH transfer failed.",
+    }
 
   for (
     const [
       code,
       friendly,
-    ] of Object.entries(
-      messages
-    )
+    ] of Object.entries(messages)
   ) {
-    if (
-      raw.includes(
-        code
-      )
-    ) {
+    if (raw.includes(code)) {
       return friendly
     }
   }
@@ -647,9 +671,12 @@ export function getFriendlyError(
     ) ||
     lower.includes(
       "user denied"
+    ) ||
+    lower.includes(
+      "action_rejected"
     )
   ) {
-    return "The MetaMask transaction was cancelled."
+    return "The MetaMask request was cancelled."
   }
 
   return raw
@@ -657,26 +684,17 @@ export function getFriendlyError(
 
 /*
   ============================================================
-  PROVIDER / CONTRACT
+  CONTRACT HELPERS
   ============================================================
 */
 
-export function getProvider() {
-  return new BrowserProvider(
-    requireMetaMask()
-  )
-}
-
 async function getReadContract() {
-  const provider =
-    getProvider()
-
-  await assertConfiguredNetwork(provider)
+  await requireReadyNetwork()
 
   return new Contract(
     getRegistrarAddress(),
     REGISTRAR_ABI,
-    provider
+    getProvider()
   )
 }
 
@@ -687,7 +705,7 @@ async function readChainClock(): Promise<ChainClock> {
   const block = await getProvider().getBlock("latest")
   if (!block) throw new Error("Could not read the latest chain timestamp.")
 
-  const blockKey = `${getExpectedChainId()}:${block.hash ?? block.number}`
+  const blockKey = `${getConfiguredChainId()}:${block.hash ?? block.number}`
   if (observedClock?.blockKey === blockKey &&
       observedClock.clock.chainTimestampMs === block.timestamp * 1000) return observedClock.clock
 
@@ -700,7 +718,7 @@ async function readChainClock(): Promise<ChainClock> {
       return saved.clock
     }
   } catch {
-    // Private browsing or damaged session data must not block contract reads.
+    // Session storage may be unavailable; contract reads still work.
   }
 
   const clock = { chainTimestampMs: block.timestamp * 1000, capturedAtMs: Date.now() }
@@ -708,16 +726,16 @@ async function readChainClock(): Promise<ChainClock> {
   try {
     sessionStorage.setItem(clockStorageKey, JSON.stringify(observedClock))
   } catch {
-    // The in-memory clock still works if session storage is unavailable.
+    // Keep the observed clock in memory when storage is unavailable.
   }
   return clock
 }
 
 async function getWriteContract() {
+  await requireReadyNetwork()
+
   const provider =
     getProvider()
-
-  await assertConfiguredNetwork(provider)
 
   const signer =
     await provider.getSigner()
@@ -753,28 +771,19 @@ Promise<string> {
 
 export async function disconnectWallet():
 Promise<void> {
-  /*
-    MetaMask does not expose a normal
-    programmatic disconnect method.
-
-    NtuApp clears its own React state.
-  */
-
   return
 }
 
 /*
   ============================================================
-  ROUND HELPERS
+  ROUND
   ============================================================
 */
 
 function phaseFromNumber(
   phase: number
 ): RoundPhase {
-  switch (
-    phase
-  ) {
+  switch (phase) {
     case 1:
       return "commit"
 
@@ -794,8 +803,7 @@ Promise<string> {
   const contract =
     await getReadContract()
 
-  const roundId:
-    bigint =
+  const roundId: bigint =
     await contract.getCurrentRound()
 
   return roundId.toString()
@@ -806,18 +814,10 @@ Promise<RoundState | null> {
   const contract =
     await getReadContract()
 
-  const roundId:
-    bigint =
+  const roundId: bigint =
     await contract.getCurrentRound()
 
-  /*
-    No round has been started yet.
-  */
-
-  if (
-    roundId ===
-    0n
-  ) {
+  if (roundId === 0n) {
     return null
   }
 
@@ -830,28 +830,20 @@ Promise<RoundState | null> {
 
   const phase =
     phaseFromNumber(
-      Number(
-        round.phase
-      )
+      Number(round.phase)
     )
 
   let phaseEndsAt:
     number | undefined
 
-  if (
-    phase ===
-    "commit"
-  ) {
+  if (phase === "commit") {
     phaseEndsAt =
       Number(
         round.commitEnd
       ) * 1000
   }
 
-  if (
-    phase ===
-    "reveal"
-  ) {
+  if (phase === "reveal") {
     phaseEndsAt =
       Number(
         round.revealEnd
@@ -878,9 +870,7 @@ Promise<RoundState | null> {
       ) * 1000,
 
     phase,
-
     phaseEndsAt,
-
     chainClock,
 
     pendingDomainCount:
@@ -901,12 +891,6 @@ Promise<RoundState | null> {
   }
 }
 
-/*
-  ============================================================
-  START ROUND
-  ============================================================
-*/
-
 export async function startAuctionRound():
 Promise<{
   roundId: string
@@ -924,12 +908,9 @@ Promise<{
   let roundId:
     string | undefined
 
-  if (
-    receipt
-  ) {
+  if (receipt) {
     for (
-      const log of
-      receipt.logs
+      const log of receipt.logs
     ) {
       try {
         const parsed =
@@ -942,23 +923,17 @@ Promise<{
           "RoundStarted"
         ) {
           roundId =
-            parsed.args
-              .roundId
-              .toString()
+            parsed.args.roundId.toString()
 
           break
         }
       } catch {
-        /*
-          Ignore unrelated logs.
-        */
+        // Ignore unrelated logs.
       }
     }
   }
 
-  if (
-    !roundId
-  ) {
+  if (!roundId) {
     throw new Error(
       "Round started, but the round ID could not be recovered."
     )
@@ -966,7 +941,6 @@ Promise<{
 
   return {
     roundId,
-
     txHash:
       tx.hash,
   }
@@ -976,43 +950,40 @@ Promise<{
   ============================================================
   COMMITMENT HASH
   ============================================================
-
-  Exact formula required by the specification:
-
-  keccak256(
-    abi.encode(
-      chainId,
-      registrarAddress,
-      roundId,
-      bidder,
-      label,
-      bidWei,
-      salt
-    )
-  )
-
-  IMPORTANT:
-  This is abi.encode, NOT abi.encodePacked.
 */
 
 export async function computeCommitmentHash(
   params: {
     roundId: bigint
-
     bidder: string
-
     label: string
-
     bidWei: bigint
-
     salt: string
+    chainId?: bigint
+    registrarAddress?: string
   }
 ): Promise<string> {
-  const provider =
-    getProvider()
+  let chainId:
+    bigint
 
-  const network =
-    await provider.getNetwork()
+  if (
+    params.chainId !==
+    undefined
+  ) {
+    chainId =
+      params.chainId
+  } else {
+    const network =
+      await getProvider()
+        .getNetwork()
+
+    chainId =
+      network.chainId
+  }
+
+  const registrarAddress =
+    params.registrarAddress ??
+    getRegistrarAddress()
 
   const coder =
     AbiCoder.defaultAbiCoder()
@@ -1029,18 +1000,12 @@ export async function computeCommitmentHash(
         "bytes32",
       ],
       [
-        network.chainId,
-
-        getRegistrarAddress(),
-
+        chainId,
+        registrarAddress,
         params.roundId,
-
         params.bidder,
-
         params.label,
-
         params.bidWei,
-
         params.salt,
       ]
     )
@@ -1048,6 +1013,452 @@ export async function computeCommitmentHash(
   return keccak256(
     encoded
   )
+}
+
+/*
+  ============================================================
+  PREPARE COMMITMENT
+  ============================================================
+*/
+
+export async function prepareBidCommitment(
+  params: {
+    name: string
+    amount: string
+    salt: string
+  }
+): Promise<Commitment> {
+  await requireReadyNetwork()
+
+  const name =
+    normalizeLabel(
+      params.name
+    )
+
+  const validation =
+    validateLabel(name)
+
+  if (!validation.valid) {
+    throw new Error(
+      validation.error ??
+        "Invalid domain name."
+    )
+  }
+
+  const provider =
+    getProvider()
+
+  const network =
+    await provider.getNetwork()
+
+  const signer =
+    await provider.getSigner()
+
+  const bidder =
+    await signer.getAddress()
+
+  const contract =
+    await getReadContract()
+
+  const roundId: bigint =
+    await contract.getCurrentRound()
+
+  if (roundId === 0n) {
+    throw new Error(
+      "No auction round has been started yet."
+    )
+  }
+
+  const round =
+    await contract.getRound(
+      roundId
+    )
+
+  if (
+    Number(round.phase) !==
+    1
+  ) {
+    throw new Error(
+      "Bids can only be committed during the commit phase."
+    )
+  }
+
+  let bidWei: bigint
+
+  try {
+    bidWei =
+      parseEther(
+        params.amount
+      )
+  } catch {
+    throw new Error(
+      "Enter a valid ETH bid with no more than 18 decimal places."
+    )
+  }
+
+  if (bidWei < 1n) {
+    throw new Error(
+      "Bid must be at least 1 wei."
+    )
+  }
+
+  const deposit: bigint =
+    await contract.COMMIT_DEPOSIT()
+
+  if (bidWei > deposit) {
+    throw new Error(
+      `Bid cannot exceed ${formatEther(
+        deposit
+      )} ETH.`
+    )
+  }
+
+  const existingId: bigint =
+    await contract.getCommitmentId(
+      roundId,
+      bidder
+    )
+
+  if (existingId > 0n) {
+    throw new Error(
+      "This wallet has already committed a bid in the current round."
+    )
+  }
+
+  const digest =
+    await computeCommitmentHash({
+      chainId:
+        network.chainId,
+
+      registrarAddress:
+        getRegistrarAddress(),
+
+      roundId,
+
+      bidder,
+
+      label:
+        name,
+
+      bidWei,
+
+      salt:
+        params.salt,
+    })
+
+  return {
+    chainId:
+      network.chainId.toString(),
+
+    registrarAddress:
+      getRegistrarAddress(),
+
+    roundId:
+      roundId.toString(),
+
+    bidder,
+    name,
+
+    amount:
+      params.amount,
+
+    bidWei:
+      bidWei.toString(),
+
+    salt:
+      params.salt,
+
+    hash:
+      digest,
+
+    txHash:
+      "",
+
+    createdAt:
+      Date.now(),
+
+    submissionStatus:
+      "prepared",
+
+    revealed:
+      false,
+
+    settled:
+      false,
+  }
+}
+
+/*
+  ============================================================
+  REQUEST COMMITMENT
+  ============================================================
+*/
+
+export async function requestBidCommitment(
+  commitment:
+    Commitment
+): Promise<{
+  txHash: string
+  commitmentId?: string
+  alreadyConfirmed: boolean
+}> {
+  await requireReadyNetwork()
+
+  const provider =
+    getProvider()
+
+  const network =
+    await provider.getNetwork()
+
+  if (
+    commitment.chainId &&
+    commitment.chainId !==
+      network.chainId.toString()
+  ) {
+    throw new Error(
+      "This prepared bid belongs to a different blockchain network."
+    )
+  }
+
+  if (
+    commitment.registrarAddress &&
+    commitment.registrarAddress.toLowerCase() !==
+      getRegistrarAddress().toLowerCase()
+  ) {
+    throw new Error(
+      "This prepared bid belongs to a different registrar deployment."
+    )
+  }
+
+  const signer =
+    await provider.getSigner()
+
+  const bidder =
+    await signer.getAddress()
+
+  if (
+    bidder.toLowerCase() !==
+    commitment.bidder.toLowerCase()
+  ) {
+    throw new Error(
+      "Switch to the wallet that prepared this bid."
+    )
+  }
+
+  const contract =
+    await getWriteContract()
+
+  const existingId: bigint =
+    await contract.getCommitmentId(
+      BigInt(
+        commitment.roundId
+      ),
+      commitment.bidder
+    )
+
+  if (existingId > 0n) {
+    const stored =
+      await contract.getCommitment(
+        existingId
+      )
+
+    if (
+      stored.digest.toLowerCase() !==
+      commitment.hash.toLowerCase()
+    ) {
+      throw new Error(
+        "A different on-chain commitment already exists for this wallet and round."
+      )
+    }
+
+    return {
+      txHash:
+        commitment.txHash,
+
+      commitmentId:
+        existingId.toString(),
+
+      alreadyConfirmed:
+        true,
+    }
+  }
+
+  const deposit: bigint =
+    await contract.COMMIT_DEPOSIT()
+
+  const tx =
+    await contract.commitBid(
+      BigInt(
+        commitment.roundId
+      ),
+      commitment.hash,
+      {
+        value:
+          deposit,
+      }
+    )
+
+  return {
+    txHash:
+      tx.hash,
+
+    alreadyConfirmed:
+      false,
+  }
+}
+
+/*
+  ============================================================
+  CONFIRM COMMITMENT
+  ============================================================
+*/
+
+export async function confirmBidCommitment(
+  commitment:
+    Commitment,
+  txHash: string
+): Promise<{
+  commitmentId: string
+  txHash: string
+}> {
+  await requireReadyNetwork()
+
+  const provider =
+    getProvider()
+
+  const contract =
+    await getReadContract()
+
+  if (txHash) {
+    const receipt =
+      await provider.waitForTransaction(
+        txHash
+      )
+
+    if (
+      receipt &&
+      receipt.status === 0
+    ) {
+      throw new Error(
+        "The commitment transaction failed on-chain."
+      )
+    }
+
+    if (receipt) {
+      if (receipt.from.toLowerCase() !== commitment.bidder.toLowerCase() ||
+          receipt.to?.toLowerCase() !== getRegistrarAddress().toLowerCase()) {
+        throw new Error("The transaction does not match the saved commitment context.")
+      }
+    }
+  }
+
+  const recoveredId: bigint =
+    await contract.getCommitmentId(
+      BigInt(
+        commitment.roundId
+      ),
+      commitment.bidder
+    )
+
+  if (recoveredId === 0n) {
+    throw new Error(
+      "The commitment has not been confirmed on-chain yet."
+    )
+  }
+
+  const stored =
+    await contract.getCommitment(
+      recoveredId
+    )
+
+  if (
+    stored.digest.toLowerCase() !==
+    commitment.hash.toLowerCase() ||
+    stored.bidder.toLowerCase() !== commitment.bidder.toLowerCase() ||
+    stored.roundId !== BigInt(commitment.roundId)
+  ) {
+    throw new Error(
+      "The on-chain commitment does not match the saved recovery record."
+    )
+  }
+
+  return {
+    commitmentId:
+      recoveredId.toString(),
+
+    txHash,
+  }
+}
+
+/*
+  ============================================================
+  RECONCILE COMMITMENT
+  ============================================================
+*/
+
+export async function reconcileBidCommitment(
+  commitment:
+    Commitment
+): Promise<Commitment> {
+  await requireReadyNetwork()
+
+  const contract =
+    await getReadContract()
+
+  const commitmentId: bigint =
+    await contract.getCommitmentId(
+      BigInt(
+        commitment.roundId
+      ),
+      commitment.bidder
+    )
+
+  if (commitmentId === 0n) {
+    if (commitment.txHash) {
+      const receipt = await getProvider().getTransactionReceipt(commitment.txHash)
+      if (receipt) {
+        return {
+          ...commitment,
+          submissionStatus: "failed",
+          submissionError: receipt.status === 0
+            ? "The commitment transaction failed on-chain."
+            : "The transaction did not create the saved commitment.",
+        }
+      }
+    }
+    return commitment
+  }
+
+  const stored =
+    await contract.getCommitment(
+      commitmentId
+    )
+
+  if (
+    stored.digest.toLowerCase() !==
+    commitment.hash.toLowerCase() ||
+    stored.bidder.toLowerCase() !== commitment.bidder.toLowerCase() ||
+    stored.roundId !== BigInt(commitment.roundId)
+  ) {
+    return {
+      ...commitment,
+      submissionStatus: "failed",
+      submissionError: "A different on-chain commitment exists for this wallet and round.",
+    }
+  }
+
+  return {
+    ...commitment,
+
+    commitmentId:
+      commitmentId.toString(),
+
+    submissionStatus:
+      "confirmed",
+
+    submissionError:
+      undefined,
+  }
 }
 
 /*
@@ -1065,13 +1476,9 @@ export async function checkDomain(
     )
 
   const validation =
-    validateLabel(
-      name
-    )
+    validateLabel(name)
 
-  if (
-    !validation.valid
-  ) {
+  if (!validation.valid) {
     throw new Error(
       validation.error ??
         "Invalid domain name."
@@ -1082,12 +1489,6 @@ export async function checkDomain(
     await getReadContract()
 
   const chainClock = await readChainClock()
-
-  /*
-    --------------------------------------------------------
-    REGISTERED?
-    --------------------------------------------------------
-  */
 
   const domain =
     await contract.getDomain(
@@ -1114,9 +1515,7 @@ export async function checkDomain(
         domain.roundId.toString(),
 
       winningCommitmentId:
-        domain
-          .winningCommitmentId
-          .toString(),
+        domain.winningCommitmentId.toString(),
 
       highestBid:
         formatEther(
@@ -1131,21 +1530,13 @@ export async function checkDomain(
     }
   }
 
-  /*
-    --------------------------------------------------------
-    RESERVED?
-    --------------------------------------------------------
-  */
-
-  const reservedRoundId:
-    bigint =
+  const reservedRoundId: bigint =
     await contract.reservedRound(
       name
     )
 
   if (
-    reservedRoundId >
-    0n
+    reservedRoundId > 0n
   ) {
     const round =
       await contract.getRound(
@@ -1160,18 +1551,12 @@ export async function checkDomain(
 
     const phase =
       phaseFromNumber(
-        Number(
-          round.phase
-        )
+        Number(round.phase)
       )
 
-    if (
-      phase ===
-      "reveal"
-    ) {
+    if (phase === "reveal") {
       return {
         name,
-
         status:
           "reveal",
 
@@ -1205,9 +1590,7 @@ export async function checkDomain(
         winningCommitmentId:
           auction.winningCommitmentId >
           0n
-            ? auction
-                .winningCommitmentId
-                .toString()
+            ? auction.winningCommitmentId.toString()
             : undefined,
 
         finalized:
@@ -1215,18 +1598,9 @@ export async function checkDomain(
       }
     }
 
-    /*
-      Round has ended but this reservation
-      has not been finalized.
-    */
-
-    if (
-      phase ===
-      "ended"
-    ) {
+    if (phase === "ended") {
       return {
         name,
-
         status:
           "ended",
 
@@ -1253,9 +1627,7 @@ export async function checkDomain(
         winningCommitmentId:
           auction.winningCommitmentId >
           0n
-            ? auction
-                .winningCommitmentId
-                .toString()
+            ? auction.winningCommitmentId.toString()
             : undefined,
 
         finalized:
@@ -1264,23 +1636,12 @@ export async function checkDomain(
     }
   }
 
-  /*
-    --------------------------------------------------------
-    LATEST ROUND
-    --------------------------------------------------------
-  */
-
-  const currentRound:
-    bigint =
+  const currentRound: bigint =
     await contract.getCurrentRound()
 
-  if (
-    currentRound ===
-    0n
-  ) {
+  if (currentRound === 0n) {
     return {
       name,
-
       status:
         "available",
     }
@@ -1293,18 +1654,12 @@ export async function checkDomain(
 
   const phase =
     phaseFromNumber(
-      Number(
-        round.phase
-      )
+      Number(round.phase)
     )
 
-  if (
-    phase ===
-    "commit"
-  ) {
+  if (phase === "commit") {
     return {
       name,
-
       status:
         "commit",
 
@@ -1320,13 +1675,9 @@ export async function checkDomain(
     }
   }
 
-  if (
-    phase ===
-    "reveal"
-  ) {
+  if (phase === "reveal") {
     return {
       name,
-
       status:
         "reveal",
 
@@ -1355,304 +1706,8 @@ export async function checkDomain(
 
 /*
   ============================================================
-  COMMIT BID
-  ============================================================
-
-  Important:
-
-  We compute the commitment LOCALLY.
-
-  We do NOT call computeCommitment() on-chain during commit,
-  because that would expose the secret inputs in the
-  transaction calldata.
-*/
-
-export async function commitBid(
-  params: {
-    name: string
-
-    amount: string
-
-    salt: string
-  },
-  hooks?: {
-    onPrepared: (record: Commitment) => Promise<void>
-    onSubmitted: (record: Commitment) => void
-  }
-): Promise<Commitment> {
-  const name =
-    normalizeLabel(
-      params.name
-    )
-
-  const validation =
-    validateLabel(
-      name
-    )
-
-  if (
-    !validation.valid
-  ) {
-    throw new Error(
-      validation.error ??
-        "Invalid domain name."
-    )
-  }
-
-  const provider =
-    getProvider()
-
-  const signer =
-    await provider.getSigner()
-
-  const bidder =
-    await signer.getAddress()
-
-  const contract =
-    await getWriteContract()
-
-  /*
-    Current round
-  */
-
-  const roundId:
-    bigint =
-    await contract.getCurrentRound()
-
-  if (
-    roundId ===
-    0n
-  ) {
-    throw new Error(
-      "No auction round has been started yet."
-    )
-  }
-
-  const round =
-    await contract.getRound(
-      roundId
-    )
-
-  if (
-    Number(
-      round.phase
-    ) !== 1
-  ) {
-    throw new Error(
-      "Bids can only be committed during the commit phase."
-    )
-  }
-
-  /*
-    Parse once into exact integer wei.
-  */
-
-  let bidWei:
-    bigint
-
-  try {
-    bidWei =
-      parseEther(
-        params.amount
-      )
-  } catch {
-    throw new Error(
-      "Enter a valid ETH bid with no more than 18 decimal places."
-    )
-  }
-
-  if (
-    bidWei <=
-    0n
-  ) {
-    throw new Error(
-      "Bid must be greater than zero."
-    )
-  }
-
-  /*
-    The specification currently defines the
-    fixed deposit as the maximum bid.
-  */
-
-  const deposit:
-    bigint =
-    await contract.COMMIT_DEPOSIT()
-
-  if (
-    bidWei >
-    deposit
-  ) {
-    throw new Error(
-      `Bid cannot exceed ${formatEther(
-        deposit
-      )} ETH.`
-    )
-  }
-
-  /*
-    One commitment per wallet per round.
-  */
-
-  const existingCommitmentId:
-    bigint =
-    await contract.getCommitmentId(
-      roundId,
-      bidder
-    )
-
-  if (
-    existingCommitmentId >
-    0n
-  ) {
-    throw new Error(
-      "This wallet has already committed a bid in the current round."
-    )
-  }
-
-  /*
-    Exact locally-computed commitment.
-  */
-
-  const digest =
-    await computeCommitmentHash({
-      roundId,
-
-      bidder,
-
-      label:
-        name,
-
-      bidWei,
-
-      salt:
-        params.salt,
-    })
-
-  const prepared: Commitment = {
-    roundId: roundId.toString(),
-    chainId: (await provider.getNetwork()).chainId.toString(),
-    registrarAddress: getRegistrarAddress(),
-    bidder,
-    name,
-    amount: params.amount,
-    bidWei: bidWei.toString(),
-    salt: params.salt,
-    hash: digest,
-    txHash: "",
-    createdAt: Date.now(),
-    revealed: false,
-    settled: false,
-  }
-
-  // The preimage must be durable and backed up before requesting wallet approval.
-  await hooks?.onPrepared(prepared)
-
-  /*
-    Frontend-facing contract function from
-    the specification.
-  */
-
-  const tx =
-    await contract.commitBid(
-      roundId,
-      digest,
-      {
-        value:
-          deposit,
-      }
-    )
-
-  hooks?.onSubmitted({ ...prepared, txHash: tx.hash })
-
-  const receipt =
-    await tx.wait()
-
-  /*
-    Recover the contract's commitment ID
-    from the emitted event.
-  */
-
-  let commitmentId:
-    string | undefined
-
-  if (
-    receipt
-  ) {
-    for (
-      const log of
-      receipt.logs
-    ) {
-      try {
-        const parsed =
-          contract.interface.parseLog(
-            log
-          )
-
-        if (
-          parsed?.name ===
-          "CommitmentSubmitted"
-        ) {
-          commitmentId =
-            parsed.args
-              .commitmentId
-              .toString()
-
-          break
-        }
-      } catch {
-        /*
-          Ignore unrelated logs.
-        */
-      }
-    }
-  }
-
-  if (
-    !commitmentId
-  ) {
-    /*
-      Fallback read.
-
-      Since one wallet has exactly one
-      commitment per round, this is safe.
-    */
-
-    const recoveredId:
-      bigint =
-      await contract.getCommitmentId(
-        roundId,
-        bidder
-      )
-
-    if (
-      recoveredId >
-      0n
-    ) {
-      commitmentId =
-        recoveredId.toString()
-    }
-  }
-
-  if (
-    !commitmentId
-  ) {
-    throw new Error(
-      "Commit succeeded, but the commitment ID could not be recovered."
-    )
-  }
-
-  return { ...prepared, commitmentId, txHash: tx.hash }
-}
-
-/*
-  ============================================================
   REVEAL BID
   ============================================================
-
-  Uses the exact stored bidWei from the backup/local record.
-
-  We do NOT convert the human-readable amount again.
 */
 
 export async function revealBid(
@@ -1660,38 +1715,91 @@ export async function revealBid(
     Commitment
 ): Promise<{
   txHash: string
-
   valid: boolean
 }> {
+  await requireReadyNetwork()
+
+  const provider =
+    getProvider()
+
+  const network =
+    await provider.getNetwork()
+
+  if (
+    commitment.chainId &&
+    commitment.chainId !==
+      network.chainId.toString()
+  ) {
+    throw new Error(
+      "This commitment belongs to a different blockchain network."
+    )
+  }
+
+  if (
+    commitment.registrarAddress &&
+    commitment.registrarAddress.toLowerCase() !==
+      getRegistrarAddress().toLowerCase()
+  ) {
+    throw new Error(
+      "This commitment belongs to a different registrar deployment."
+    )
+  }
+
+  const signer =
+    await provider.getSigner()
+
+  const account =
+    await signer.getAddress()
+
+  if (
+    account.toLowerCase() !==
+    commitment.bidder.toLowerCase()
+  ) {
+    throw new Error(
+      "Switch to the wallet that created this commitment."
+    )
+  }
+
   const contract =
     await getWriteContract()
 
-  const bidWei =
-    BigInt(
-      commitment.bidWei
+  const commitmentId: bigint =
+    await contract.getCommitmentId(
+      BigInt(
+        commitment.roundId
+      ),
+      commitment.bidder
     )
 
-  /*
-    Final specification frontend API:
-
-    revealBid(
-      roundId,
-      label,
-      bidWei,
-      salt
+  if (commitmentId === 0n) {
+    throw new Error(
+      "This saved bid has not been committed on-chain."
     )
-  */
+  }
+
+  const stored =
+    await contract.getCommitment(
+      commitmentId
+    )
+
+  if (
+    stored.digest.toLowerCase() !==
+    commitment.hash.toLowerCase()
+  ) {
+    throw new Error(
+      "The saved recovery data does not match the on-chain commitment."
+    )
+  }
 
   const tx =
     await contract.revealBid(
       BigInt(
         commitment.roundId
       ),
-
       commitment.name,
-
-      bidWei,
-
+      BigInt(
+        commitment.bidWei
+      ),
       commitment.salt
     )
 
@@ -1701,12 +1809,9 @@ export async function revealBid(
   let valid =
     false
 
-  if (
-    receipt
-  ) {
+  if (receipt) {
     for (
-      const log of
-      receipt.logs
+      const log of receipt.logs
     ) {
       try {
         const parsed =
@@ -1726,9 +1831,7 @@ export async function revealBid(
           break
         }
       } catch {
-        /*
-          Ignore unrelated logs.
-        */
+        // Ignore unrelated logs.
       }
     }
   }
@@ -1745,46 +1848,32 @@ export async function revealBid(
   ============================================================
   FINALIZE DOMAIN
   ============================================================
-
-  Anyone may call this.
-
-  Ownership still goes to the actual winning bidder.
 */
 
 export async function finalizeDomain(
   name: string
 ): Promise<{
   owner: string
-
   txHash: string
 }> {
   const canonical =
-    normalizeLabel(
-      name
-    )
+    normalizeLabel(name)
 
   const contract =
     await getWriteContract()
 
-  const reservedRound:
-    bigint =
+  const reservedRound: bigint =
     await contract.reservedRound(
       canonical
     )
 
   if (
-    reservedRound ===
-    0n
+    reservedRound === 0n
   ) {
     throw new Error(
       "There is no pending auction to finalize for this name."
     )
   }
-
-  /*
-    Use the specification's explicit round-aware
-    finalization function.
-  */
 
   const tx =
     await contract.finalizeDomain(
@@ -1798,12 +1887,9 @@ export async function finalizeDomain(
   let owner:
     string | undefined
 
-  if (
-    receipt
-  ) {
+  if (receipt) {
     for (
-      const log of
-      receipt.logs
+      const log of receipt.logs
     ) {
       try {
         const parsed =
@@ -1821,16 +1907,12 @@ export async function finalizeDomain(
           break
         }
       } catch {
-        /*
-          Ignore unrelated logs.
-        */
+        // Ignore unrelated logs.
       }
     }
   }
 
-  if (
-    !owner
-  ) {
+  if (!owner) {
     const domain =
       await contract.getDomain(
         canonical
@@ -1845,9 +1927,7 @@ export async function finalizeDomain(
     }
   }
 
-  if (
-    !owner
-  ) {
+  if (!owner) {
     throw new Error(
       "Domain finalized, but the new owner could not be recovered."
     )
@@ -1855,7 +1935,6 @@ export async function finalizeDomain(
 
   return {
     owner,
-
     txHash:
       tx.hash,
   }
@@ -1872,25 +1951,13 @@ export async function settleCommitment(
     Commitment
 ): Promise<{
   txHash: string
-
   refundWei: string
-
   refundEth: string
-
   proceedsWei: string
-
   proceedsEth: string
 }> {
   const contract =
     await getWriteContract()
-
-  /*
-    Specification-facing API:
-
-    settleBid(roundId)
-
-    The contract looks up msg.sender's commitment.
-  */
 
   const tx =
     await contract.settleBid(
@@ -1908,12 +1975,9 @@ export async function settleCommitment(
   let proceedsWei =
     0n
 
-  if (
-    receipt
-  ) {
+  if (receipt) {
     for (
-      const log of
-      receipt.logs
+      const log of receipt.logs
     ) {
       try {
         const parsed =
@@ -1934,9 +1998,7 @@ export async function settleCommitment(
           break
         }
       } catch {
-        /*
-          Ignore unrelated logs.
-        */
+        // Ignore unrelated logs.
       }
     }
   }
@@ -1965,7 +2027,7 @@ export async function settleCommitment(
 
 /*
   ============================================================
-  WITHDRAWAL CREDIT
+  WITHDRAWAL
   ============================================================
 */
 
@@ -1973,14 +2035,12 @@ export async function getWithdrawalCredit(
   account: string
 ): Promise<{
   wei: string
-
   eth: string
 }> {
   const contract =
     await getReadContract()
 
-  const amount:
-    bigint =
+  const amount: bigint =
     await contract.withdrawalCredits(
       account
     )
@@ -1999,9 +2059,7 @@ export async function getWithdrawalCredit(
 export async function withdrawCredit():
 Promise<{
   txHash: string
-
   amountWei: string
-
   amountEth: string
 }> {
   const contract =
@@ -2016,12 +2074,9 @@ Promise<{
   let amount =
     0n
 
-  if (
-    receipt
-  ) {
+  if (receipt) {
     for (
-      const log of
-      receipt.logs
+      const log of receipt.logs
     ) {
       try {
         const parsed =
@@ -2039,9 +2094,7 @@ Promise<{
           break
         }
       } catch {
-        /*
-          Ignore unrelated logs.
-        */
+        // Ignore unrelated logs.
       }
     }
   }
@@ -2062,7 +2115,7 @@ Promise<{
 
 /*
   ============================================================
-  RESOLUTION
+  DOMAIN RESOLUTION
   ============================================================
 */
 
@@ -2075,13 +2128,9 @@ export async function resolveDomain(
     )
 
   const validation =
-    validateLabel(
-      name
-    )
+    validateLabel(name)
 
-  if (
-    !validation.valid
-  ) {
+  if (!validation.valid) {
     throw new Error(
       validation.error ??
         "Invalid domain name."
@@ -2091,8 +2140,7 @@ export async function resolveDomain(
   const contract =
     await getReadContract()
 
-  const address:
-    string =
+  const address: string =
     await contract.resolve(
       name
     )
@@ -2111,7 +2159,7 @@ export async function resolveDomain(
 
 /*
   ============================================================
-  UPDATE RESOLUTION ADDRESS
+  SET RESOLUTION ADDRESS
   ============================================================
 */
 
@@ -2122,29 +2170,19 @@ export async function setResolutionAddress(
   txHash: string
 }> {
   const name =
-    normalizeLabel(
-      rawName
-    )
+    normalizeLabel(rawName)
 
   const validation =
-    validateLabel(
-      name
-    )
+    validateLabel(name)
 
-  if (
-    !validation.valid
-  ) {
+  if (!validation.valid) {
     throw new Error(
       validation.error ??
         "Invalid domain name."
     )
   }
 
-  if (
-    !isAddress(
-      target
-    )
-  ) {
+  if (!isAddress(target)) {
     throw new Error(
       "Enter a valid Ethereum address."
     )
@@ -2187,60 +2225,34 @@ export async function setResolutionAddress(
 
 /*
   ============================================================
-  SEND ETH TO .NTU
+  PAYMENT PREVIEW
   ============================================================
-
-  Flow:
-
-      resolve(label)
-             ↓
-      display/remember recipient
-             ↓
-      sendToDomain(
-        label,
-        expectedRecipient,
-        { value }
-      )
-
-  Contract re-checks the resolution address before
-  forwarding payment.
 */
-
-export interface PaymentPreview {
-  name: string
-  amount: string
-  resolvedAddress: string
-  chainId: string
-}
 
 export async function previewPayment(
   params: {
     name: string
-
     amount: string
   }
 ): Promise<PaymentPreview> {
+  await requireReadyNetwork()
+
   const name =
     normalizeLabel(
       params.name
     )
 
   const validation =
-    validateLabel(
-      name
-    )
+    validateLabel(name)
 
-  if (
-    !validation.valid
-  ) {
+  if (!validation.valid) {
     throw new Error(
       validation.error ??
         "Invalid domain name."
     )
   }
 
-  let amountWei:
-    bigint
+  let amountWei: bigint
 
   try {
     amountWei =
@@ -2254,59 +2266,154 @@ export async function previewPayment(
   }
 
   if (
-    amountWei <=
-    0n
+    amountWei <= 0n
   ) {
     throw new Error(
       "Payment amount must be greater than zero."
     )
   }
 
-  const resolvedAddress =
-    await resolveDomain(
+  const provider =
+    getProvider()
+
+  const network =
+    await provider.getNetwork()
+
+  const contract =
+    await getReadContract()
+
+  const recipient: string =
+    await contract.resolve(
       name
     )
 
-  const chainId = (await getProvider().getNetwork()).chainId.toString()
+  if (
+    recipient ===
+    ZeroAddress
+  ) {
+    throw new Error(
+      `${name}.ntu is not registered or does not currently resolve to an Ethereum address.`
+    )
+  }
 
-  return { name, amount: params.amount, resolvedAddress, chainId }
+  return {
+    name,
+
+    amount:
+      params.amount,
+
+    amountWei:
+      amountWei.toString(),
+
+    recipient,
+
+    chainId:
+      network.chainId.toString(),
+
+    networkName:
+      getNetworkName(
+        network.chainId,
+        network.name
+      ),
+
+    createdAt:
+      Date.now(),
+  }
 }
 
-export async function sendPayment(
-  preview: PaymentPreview
+/*
+  ============================================================
+  PAYMENT CONFIRMATION
+  ============================================================
+*/
+
+export async function confirmPayment(
+  preview:
+    PaymentPreview
 ): Promise<{
   resolvedAddress: string
   txHash: string
 }> {
-  const name = normalizeLabel(preview.name)
-  const validation = validateLabel(name)
-  if (!validation.valid) throw new Error(validation.error ?? "Invalid domain name.")
+  await requireReadyNetwork()
 
-  const amountWei = parseEther(preview.amount)
-  if (amountWei <= 0n) throw new Error("Payment amount must be greater than zero.")
-  if (!isAddress(preview.resolvedAddress) || preview.resolvedAddress === ZeroAddress) {
-    throw new Error("The confirmed recipient is invalid. Review the domain again.")
-  }
+  const provider =
+    getProvider()
 
-  if ((await getProvider().getNetwork()).chainId.toString() !== preview.chainId) {
-    throw new Error("The network changed. Review the recipient and network again.")
+  const network =
+    await provider.getNetwork()
+
+  /*
+    Force a fresh preview if network changed.
+  */
+
+  if (
+    network.chainId.toString() !==
+    preview.chainId
+  ) {
+    throw new Error(
+      "The network changed after the payment preview. Please preview the payment again."
+    )
   }
 
   const contract =
+    await getReadContract()
+
+  /*
+    Resolve again immediately before opening MetaMask.
+  */
+
+  const currentRecipient: string =
+    await contract.resolve(
+      preview.name
+    )
+
+  if (
+    currentRecipient ===
+    ZeroAddress
+  ) {
+    throw new Error(
+      "The domain no longer resolves to a valid recipient. Please preview the payment again."
+    )
+  }
+
+  /*
+    If resolution changed, require a new confirmation.
+  */
+
+  if (
+    currentRecipient.toLowerCase() !==
+    preview.recipient.toLowerCase()
+  ) {
+    throw new Error(
+      "The domain recipient changed after the payment preview. Please review the new recipient and confirm again."
+    )
+  }
+
+  const amountWei =
+    BigInt(
+      preview.amountWei
+    )
+
+  if (
+    amountWei <= 0n
+  ) {
+    throw new Error(
+      "Payment amount must be greater than zero."
+    )
+  }
+
+  const writeContract =
     await getWriteContract()
 
   /*
-    Checked payment.
-
-    If the resolution address has changed since
-    resolveDomain(), the contract reverts with
-    RECIPIENT CHANGED.
+    The contract receives exactly the address that
+    the user reviewed in the preview.
   */
 
   const tx =
-    await contract.sendToDomain(
-      name,
-      preview.resolvedAddress,
+    await writeContract.sendToDomain(
+      preview.name,
+      preview.recipient,
       {
         value:
           amountWei,
@@ -2316,7 +2423,8 @@ export async function sendPayment(
   await tx.wait()
 
   return {
-    resolvedAddress: preview.resolvedAddress,
+    resolvedAddress:
+      preview.recipient,
 
     txHash:
       tx.hash,
@@ -2357,8 +2465,6 @@ export function phaseRemainingMs(
   const estimatedChainTime = clock
     ? clock.chainTimestampMs + Math.max(0, now - clock.capturedAtMs)
     : now
-  // Wall time is only an estimate between blocks. If the last observed block
-  // still has time left, keep the action available for the contract to decide.
   if (clock && clock.chainTimestampMs < timestamp) {
     return Math.max(1, timestamp - estimatedChainTime)
   }
@@ -2382,9 +2488,7 @@ export function formatTimeLeft(
   clock?: ChainClock,
   now = Date.now()
 ): string {
-  if (
-    !timestamp
-  ) {
+  if (!timestamp) {
     return "—"
   }
 
@@ -2411,10 +2515,7 @@ export function formatTimeLeft(
     totalSeconds %
     60
 
-  if (
-    minutes >
-    0
-  ) {
+  if (minutes > 0) {
     return `${minutes}m ${seconds}s`
   }
 

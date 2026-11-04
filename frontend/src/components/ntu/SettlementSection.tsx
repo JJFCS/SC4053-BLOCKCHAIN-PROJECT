@@ -4,18 +4,18 @@ import {
     Coins,
     RefreshCcw,
   } from "lucide-react"
-  
+
   import {
     Button,
     Card,
     Notice,
   } from "./primitives"
-  
+
   import {
     shortenHex,
     type Commitment,
   } from "./handlers"
-  
+
   export interface SettlementResult {
     name: string
     commitmentId: string
@@ -23,12 +23,12 @@ import {
     proceedsEth: string
     txHash: string
   }
-  
+
   export interface WithdrawalResult {
     amountEth: string
     txHash: string
   }
-  
+
   export function SettlementSection({
     account,
     commitments,
@@ -43,27 +43,27 @@ import {
     onWithdraw,
   }: {
     account: string | null
-  
+
     commitments: Commitment[]
-  
+
     settlingHash: string | null
-  
+
     withdrawalCreditEth: string
-  
+
     loadingCredit: boolean
-  
+
     withdrawing: boolean
-  
+
     lastSettlement: SettlementResult | null
-  
+
     lastWithdrawal: WithdrawalResult | null
-  
+
     onSettle: (
       commitment: Commitment
     ) => void
-  
+
     onRefreshCredit: () => void
-  
+
     onWithdraw: () => void
   }) {
     const userCommitments =
@@ -74,12 +74,12 @@ import {
               account.toLowerCase()
           )
         : commitments
-  
+
     const hasCredit =
       Number(
         withdrawalCreditEth
       ) > 0
-  
+
     return (
       <Card
         title="Settle bids & withdraw"
@@ -96,19 +96,19 @@ import {
             </Notice>
           </div>
         )}
-  
+
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Withdrawal credit
               </p>
-  
+
               <p className="mt-1 font-mono text-xl font-semibold text-zinc-900">
                 {withdrawalCreditEth} ETH
               </p>
             </div>
-  
+
             <div className="flex gap-2">
               <Button
                 variant="secondary"
@@ -127,7 +127,7 @@ import {
                 <RefreshCcw className="size-4" />
                 Refresh
               </Button>
-  
+
               <Button
                 className="h-10"
                 disabled={
@@ -146,17 +146,17 @@ import {
               </Button>
             </div>
           </div>
-  
+
           <p className="mt-3 text-xs leading-relaxed text-zinc-500">
             Settlement does not immediately send ETH back to your wallet. It adds the refund to your withdrawal credit. You then withdraw that credit in a separate transaction.
           </p>
         </div>
-  
+
         <div className="mt-5">
           <p className="mb-3 text-xs font-medium uppercase tracking-wider text-zinc-500">
             Your commitments
           </p>
-  
+
           {userCommitments.length ===
           0 ? (
             <div className="rounded-xl border border-dashed border-zinc-200 px-4 py-8 text-center">
@@ -174,7 +174,7 @@ import {
                     !!account &&
                     commitment.bidder.toLowerCase() ===
                       account.toLowerCase()
-  
+
                   return (
                     <li
                       key={
@@ -192,7 +192,7 @@ import {
                               .ntu
                             </span>
                           </p>
-  
+
                           <p className="mt-1 text-xs text-zinc-500">
                             Round{" "}
                             {
@@ -204,50 +204,50 @@ import {
                               : "—"}
                           </p>
                         </div>
-  
+
                         <SettlementBadge
                           commitment={
                             commitment
                           }
                         />
                       </div>
-  
+
                       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                         <dt className="text-zinc-500">
                           Bid
                         </dt>
-  
+
                         <dd className="text-right font-mono text-zinc-800">
                           {
                             commitment.amount
                           }{" "}
                           ETH
                         </dd>
-  
+
                         <dt className="text-zinc-500">
                           Wallet
                         </dt>
-  
+
                         <dd className="text-right font-mono text-zinc-800">
                           {shortenHex(
                             commitment.bidder,
                             6
                           )}
                         </dd>
-  
+
                         <dt className="text-zinc-500">
                           Reveal status
                         </dt>
-  
+
                         <dd className="text-right text-zinc-800">
-                          {commitment.submissionFailed
+                          {commitment.submissionStatus === "failed"
                             ? "No on-chain bid"
                             : commitment.revealed
                             ? "Revealed"
                             : "Not revealed"}
                         </dd>
                       </dl>
-  
+
                       {!commitment.settled && (
                         <Button
                           variant="secondary"
@@ -280,13 +280,13 @@ import {
             </ul>
           )}
         </div>
-  
+
         <div className="mt-4">
           <Notice>
             Settlement is only available after the round ends. For a revealed bid, the domain must also be finalized first.
           </Notice>
         </div>
-  
+
         {lastSettlement && (
           <div className="mt-4">
             <Notice tone="success">
@@ -315,7 +315,7 @@ import {
             </Notice>
           </div>
         )}
-  
+
         {lastWithdrawal && (
           <div className="mt-3">
             <Notice tone="success">
@@ -340,13 +340,13 @@ import {
       </Card>
     )
   }
-  
+
   function SettlementBadge({
     commitment,
   }: {
     commitment: Commitment
   }) {
-    if (commitment.submissionFailed) {
+    if (commitment.submissionStatus === "failed") {
       return (
         <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs text-red-800">
           Commit failed
@@ -364,7 +364,7 @@ import {
         </span>
       )
     }
-  
+
     if (
       commitment.revealed
     ) {
@@ -374,7 +374,7 @@ import {
         </span>
       )
     }
-  
+
     return (
       <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs text-amber-700">
         Unrevealed
