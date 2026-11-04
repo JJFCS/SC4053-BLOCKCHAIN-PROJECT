@@ -37,6 +37,7 @@ import {
   getCurrentRoundState,
   getFriendlyError,
   getNetworkStatus,
+  getRegistrarAddress,
   getWithdrawalCredit,
   prepareBidCommitment,
   previewPayment,
@@ -2023,49 +2024,60 @@ export default function NtuApp() {
 
     const handleDownloadBackup =
     async () => {
-      if (
-        commitments.length ===
-        0
-      ) {
+      if (!account) {
         alert(
-          "No commitments to back up."
+          "Connect the wallet whose commitments you want to back up."
         )
-
+  
         return
       }
-
+  
+      if (!networkStatus?.ready) {
+        alert(
+          "Connect to the configured registrar network before exporting a backup."
+        )
+  
+        return
+      }
+  
+      const registrarAddress =
+        getRegistrarAddress()
+          .toLowerCase()
+  
       /*
-        Legacy development records may not contain
-        chain/registrar context.
-
-        Do not let one legacy record prevent every valid
-        modern commitment from being exported.
+        Only export commitments that belong to:
+        - the currently connected wallet
+        - the current chain
+        - the current registrar deployment
+  
+        This prevents one backup file from accidentally
+        containing bids belonging to multiple wallets.
       */
-
+  
       const exportable =
         commitments.filter(
           (commitment) =>
-            Boolean(
-              commitment.chainId &&
-              commitment.registrarAddress
-            )
+            commitment.chainId ===
+              networkStatus.chainId &&
+            commitment.registrarAddress
+              ?.toLowerCase() ===
+              registrarAddress &&
+            commitment.bidder
+              .toLowerCase() ===
+              account.toLowerCase()
         )
-
-      const skipped =
-        commitments.length -
-        exportable.length
-
+  
       if (
         exportable.length ===
         0
       ) {
         alert(
-          "None of the saved commitments contain enough context to create a safe reveal backup."
+          "No commitments were found for this wallet on the current registrar."
         )
-
+  
         return
       }
-
+  
       try {
         const backups =
           await Promise.all(
@@ -2076,7 +2088,7 @@ export default function NtuApp() {
                 )
             )
           )
-
+  
         const blob =
           new Blob(
             [
@@ -2091,52 +2103,39 @@ export default function NtuApp() {
                 "application/json",
             }
           )
-
+  
         const url =
           URL.createObjectURL(
             blob
           )
-
+  
         const anchor =
           document.createElement(
             "a"
           )
-
+  
         anchor.href =
           url
-
+  
         anchor.download =
-          "ntu-reveal-backup-v1.json"
-
+          `ntu-reveal-backup-v1-${account.slice(
+            0,
+            6
+          )}-${networkStatus.chainId}.json`
+  
         document.body.appendChild(
           anchor
         )
-
+  
         anchor.click()
-
+  
         document.body.removeChild(
           anchor
         )
-
+  
         URL.revokeObjectURL(
           url
         )
-
-        if (
-          skipped > 0
-        ) {
-          alert(
-            `Backup created successfully. ${skipped} older legacy record${
-              skipped === 1
-                ? " was"
-                : "s were"
-            } skipped because ${
-              skipped === 1
-                ? "it does"
-                : "they do"
-            } not contain the original chain and registrar context.`
-          )
-        }
       } catch (error) {
         alert(
           getFriendlyError(

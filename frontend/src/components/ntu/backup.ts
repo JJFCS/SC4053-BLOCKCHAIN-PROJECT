@@ -666,25 +666,36 @@ import {
       - the transaction is pending/not yet observable
     */
 
-    if (
-      commitmentId === 0n
-    ) {
-      return {
-        onChainFound:
-          false,
-
-        revealed:
-          backup.revealed ??
-          false,
-
-        valid:
-          backup.valid,
-
-        settled:
-          backup.settled ??
-          false,
+      if (
+        commitmentId === 0n
+      ) {
+        /*
+          No commitment exists on-chain.
+      
+          The backup may still be valid local recovery data
+          for a prepared, rejected, failed or pending bid.
+      
+          But chain-derived fields must NOT be trusted from
+          the JSON backup itself.
+        */
+      
+        return {
+          onChainFound:
+            false,
+      
+          commitmentId:
+            undefined,
+      
+          revealed:
+            false,
+      
+          valid:
+            undefined,
+      
+          settled:
+            false,
+        }
       }
-    }
 
     const stored =
       await contract.getCommitment(
@@ -827,9 +838,10 @@ import {
         backup.commitTxHash ??
         "",
 
-      commitmentId:
-        verification?.commitmentId ??
-        backup.commitmentId,
+        commitmentId:
+        verification
+          ? verification.commitmentId
+          : backup.commitmentId,
 
       /*
         Preserve the original local timestamp where available.
@@ -848,21 +860,21 @@ import {
           ? undefined
           : backup.submissionError,
 
-      revealed:
-        verification?.onChainFound
-          ? verification.revealed
-          : backup.revealed ??
-            false,
-
-      valid:
-        verification?.onChainFound
-          ? verification.valid
-          : backup.valid,
-
-      settled:
-        verification?.onChainFound
-          ? verification.settled
-          : backup.settled ??
-            false,
+          revealed:
+          verification
+            ? verification.revealed
+            : backup.revealed ??
+              false,
+        
+        valid:
+          verification
+            ? verification.valid
+            : backup.valid,
+        
+        settled:
+          verification
+            ? verification.settled
+            : backup.settled ??
+              false,
     }
   }
