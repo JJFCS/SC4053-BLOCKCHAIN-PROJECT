@@ -1,0 +1,259 @@
+{
+  "name": "a-original-tests",
+  "cwd": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts",
+  "command": [
+    "npx",
+    "--no-install",
+    "hardhat",
+    "test"
+  ],
+  "startedAt": "2026-10-27T04:44:52.958223+00:00",
+  "endedAt": "2026-10-27T04:45:33.604838+00:00",
+  "exitCode": 0
+}
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Downloading solc 0.8.34
+Downloading solc 0.8.34 (WASM build)
+
+Compiled 16 Solidity files with solc 0.8.34 (evm target: osaka)
+
+Running Solidity tests
+
+  contracts/DomainRegistrarCommit.t.sol:DomainRegistrarCommitTest
+    ✔ test_GetCommitmentRejectsUnknownId()
+    ✔ test_CommitStoresRecordAndDeposit()
+    ✔ test_CommitRequiresExactDeposit()
+    ✔ test_CommitRejectsWrongRoundAndRevealPhase()
+    ✔ test_CommitRejectsSecondCommitmentEvenWithAnotherHash()
+    ✔ test_CommitRejectsEmptyHash()
+    ✔ test_CommitAllowsSameHashFromAnotherBidder()
+    ✔ test_CommitAcceptsNextRoundAtItsStart()
+
+  contracts/DomainRegistrarAuction.t.sol:DomainRegistrarAuctionTest
+    ✔ test_UnrevealedBidDoesNotReserveName()
+    ✔ test_UnknownNameHasNoAuction()
+    ✔ test_LaterRoundCannotReplaceReservedName()
+    ✔ test_LaterCommitmentDoesNotReplaceEqualBid()
+    ✔ test_InvalidRevealsDoNotReserveName()
+    ✔ test_HigherBidReplacesLeaderAndLowerBidDoesNot()
+    ✔ test_FirstValidRevealSetsLeader()
+    ✔ test_EarlierCommitmentWinsTieWhenRevealedLast()
+    ✔ test_DifferentNamesHaveSeparateLeaders()
+
+  contracts/DomainRegistrarOwnership.t.sol:DomainRegistrarOwnershipTest
+    ✔ test_WithoutValidRevealThereIsNoOwner()
+    ✔ test_RejectsSecondFinalization()
+    ✔ test_RejectsInvalidAndUnknownNames()
+    ✔ test_RegisteredNameCannotBeTakenByLaterRound()
+    ✔ test_PendingAndUnknownNamesHaveNoOwner()
+    ✔ test_FinalizationStartsAt240Seconds()
+    ✔ test_CanFinalizeAnOlderRound()
+    ✔ test_AnyoneCanFinalizeForWinningBidder()
+
+  contracts/DomainRegistrarPayments.t.sol:DomainRegistrarPaymentsTest
+    ✔ test_UsesUpdatedAddressAfterFreshConfirmation()
+    ✔ test_TreasuryCallbackCannotEnterDomainPayments()
+    ✔ test_RejectsZeroPayment()
+    ✔ test_RejectsStaleRecipientWithoutPayingEitherAddress()
+    ✔ test_RejectsReservedNameEvenAfterRevealDeadline()
+    ✔ test_RejectsInvalidLabels()
+    ✔ test_RejectsIncorrectExpectedRecipients()
+    ✔ test_RejectsAvailableName()
+    ✔ test_RejectingReceiverRevertsPaymentAndAllowsRetry()
+    ✔ test_RejectingReceiverDoesNotBlockAnotherDomain()
+    ✔ test_RefundCallbackCannotEnterDomainPayments()
+    ✔ test_PaymentToTreasuryCannotWithdrawItsCredit()
+    ✔ test_PaymentCallbackCannotReenterPaymentsOrWithdrawals()
+    ✔ test_OneWeiPaymentSucceeds()
+    ✔ test_ForwardsExactValueAndEmitsPayment()
+    ✔ test_ExtraEtherInRegistrarIsNotForwarded()
+
+  contracts/DomainRegistrar.t.sol:DomainRegistrarTest
+    ✔ test_RejectsWhitespaceAndPunctuation()
+    ✔ test_RejectsUppercaseAndSuffix()
+    ✔ test_RejectsOneAndTwoByteLabels()
+    ✔ test_RejectsNonAsciiLabels()
+    ✔ test_RejectsHyphensAtEdges()
+    ✔ test_RejectsEmptyAnd33ByteLabels()
+    ✔ test_CommitmentStaysTheSameAsTimePasses()
+    ✔ test_CommitmentChangesWhenBidDetailsChange()
+    ✔ test_CommitmentChangesForAnotherRegistrar()
+    ✔ test_CommitmentChangesForAnotherChain()
+    ✔ test_AcceptsCanonicalLabels()
+    ✔ test_Accepts32ByteLabel()
+
+  contracts/DomainRegistrarWithdrawal.t.sol:DomainRegistrarWithdrawalTest
+    ✔ test_TreasuryCannotWithdrawRefundsOrLockedDeposits()
+    ✔ test_TreasuryCallbackCannotReenterWithdrawals()
+    ✔ test_TreasuryAccessAndRepeatedWithdrawal()
+    ✔ test_RejectsEmptyAndRepeatedRefunds()
+    ✔ test_RefundPaysCallerAndClearsCredit()
+    ✔ test_RefundCallbackCannotReenterWithdrawals()
+    ✔ test_FailedTreasuryPaymentCanBeRetried()
+    ✔ test_FailedRefundCanBeRetriedWithoutBlockingOthers()
+    ✔ test_AllCreditsCanBeWithdrawn()
+
+  contracts/DomainRegistrarResolution.t.sol:DomainRegistrarResolutionTest
+    ✔ test_ReservedAndUnknownNamesCannotBeUpdated()
+    ✔ test_ReservationClearsOnlyAfterFinalization()
+    ✔ test_RejectsZeroAndRegistrarTargets()
+    ✔ test_OwnerCanUpdateAgainAndRestoreInitialAddress()
+    ✔ test_OwnerCanUpdateAddressWithoutChangingOwnership()
+    ✔ test_OnlyOwnerCanUpdateIncludingAfterAddressChange()
+    ✔ test_InvalidLabelsRejectedByResolutionOperations()
+    ✔ test_FinalizationSetsInitialResolutionToWinner()
+    ✔ test_AddressUpdateDoesNotChangeAnotherDomain()
+
+  contracts/DomainRegistrarSettlement.t.sol:DomainRegistrarSettlementTest
+    ✔ test_UnrevealedBidSettlesWithoutFinalizingOtherDomains()
+    ✔ test_SettlementStartsAtRevealDeadlineAndRequiresFinalization()
+    ✔ test_RejectsZeroTreasuryAtDeployment()
+    ✔ test_RejectsMissingAndRepeatedSettlementAcrossEntryPoints()
+    ✔ test_RejectedRevealFollowsNonRevealPenaltyPolicy()
+    ✔ test_LosingBidAlsoWaitsForFinalizationThenGetsFullDeposit()
+    ✔ test_FinalizationCreditsWinningPaymentExactlyOnceWithoutSendingETH()
+    ✔ test_DeploymentUsesFixedDefaultsAndSuppliedTreasury()
+    ✔ test_AnotherWalletCannotSettleRecordedBid()
+    ✔ test_AllDepositsRemainClaimableDuringLaterRound()
+
+  contracts/DomainRegistrarReveal.t.sol:DomainRegistrarRevealTest
+    ✔ test_RevealUsesOriginalRound()
+    ✔ test_RevealStartsAt120SecondsAndStoresBid()
+    ✔ test_RevealRejectsUnknownId()
+    ✔ test_RevealRejectsSecondReveal()
+    ✔ test_RevealRejectsInvalidLabelWithoutConsuming()
+    ✔ test_RevealRejectsChangedDetailsAndAllowsRetry()
+    ✔ test_RevealEndsAt240Seconds()
+    ✔ test_RevealChecksBidLimits()
+    ✔ test_CopiedHashCannotBeRevealedByAnotherBidder()
+
+  contracts/DomainRegistrarRounds.t.sol:DomainRegistrarRoundsTest
+    ✔ test_StartedRoundBeginsInCommitPhase()
+    ✔ test_RoundTwoFollowsItsOwnSchedule()
+    ✔ test_RoundOneIncludesBothWindows()
+    ✔ test_RoundOneDeadlines()
+    ✔ test_RevealEndsAt240Seconds()
+    ✔ test_RejectsUnstartedRounds()
+    ✔ test_RejectsStartingDuringCommitAndReveal()
+    ✔ test_RejectsRoundZero()
+    ✔ test_NextRoundCanStartAtRevealDeadline()
+    ✔ test_NewRoundPreservesDepositsCreditsAndOwner()
+    ✔ test_LaterRoundIdsOnlyIncreaseOnStartCalls()
+    ✔ test_KeepsEarlierRoundDeadlines()
+    ✔ test_EndedRoundStaysLatestUntilExplicitStart()
+    ✔ test_DeploymentAndElapsedTimeDoNotStartRound()
+    ✔ test_DelayedNextRoundGetsFreshWindows()
+    ✔ test_CommitRequiresAnExplicitlyStartedRound()
+    ✔ test_CommitEndsAt120Seconds()
+    ✔ test_AnyoneCanStartFirstRoundAfterDelay()
+    ✔ testFuzz_DelayedFirstRoundKeepsFullWindows(uint32) (runs: 256)
+
+  contracts/DomainRegistrarBidRules.t.sol:DomainRegistrarBidRulesTest
+    ✔ test_ShortNamesRejectedByDomainOperations()
+    ✔ test_RevealByRoundUsesCallersOwnCommitment()
+    ✔ test_RevealByRoundHonorsStartAndEndBoundaries()
+    ✔ test_RejectedCommitsLeaveWalletSlotAndSequenceUnused()
+    ✔ test_NewRoundAllowsSameWalletAndKeepsOldRecord()
+    ✔ test_NewCommitEntryPointHonorsExactDeadline()
+    ✔ test_FailedRevealDetailsPreserveRecordAndAllowCorrectRetry()
+    ✔ test_CopiedHashDoesNotWorkForAnotherWalletOrContract()
+    ✔ test_CommitmentLookupSeparatesWalletsAndRejectsUnknownRounds()
+    ✔ test_ChangedChainCannotRevealUntilOriginalContextRestored()
+    ✔ test_BothRevealEntryPointsRejectRepeatedReveal()
+    ✔ test_BothCommitEntryPointsEnforceOneCommitmentPerWallet()
+    ✔ testFuzz_SecondHashCannotReplaceWalletCommitment(bytes32,bool) (runs: 256)
+
+  contracts/Counter.t.sol:CounterTest
+    ✔ test_InitialValue()
+    ✔ test_IncByZero()
+    ✔ testFuzz_Inc(uint8) (runs: 256)
+
+  contracts/DomainRegistrarAuctionRecords.t.sol:DomainRegistrarAuctionRecordsTest
+    ✔ test_ThreeRoundsMaintainIndependentPendingCounters()
+    ✔ test_SettlementDoesNotFinalizePendingDomains()
+    ✔ test_RoundAuctionReadsValidateRoundAndLabel()
+    ✔ test_RejectedFinalizationsLeaveRecordsUnchanged()
+    ✔ test_RegisteredNameCannotBeReservedAgain()
+    ✔ test_OlderSettlementReadsOriginalRoundAuction()
+    ✔ test_NewRoundStartsWithZeroWhileOlderDomainsRemainPending()
+    ✔ test_LaterRoundCannotReplaceEarlierReservation()
+    ✔ test_LaterRoundCanUseNameWithoutEarlierValidReveal()
+    ✔ test_LabelOnlyFinalizationUpdatesPendingCount()
+    ✔ test_InvalidAndUnrevealedCommitmentsDoNotCreatePendingDomains()
+    ✔ test_FinalizingOlderRoundLeavesNewerAuctionAndScheduleUnchanged()
+    ✔ test_FinalizationUpdatesHistoryReservationAndCounterExactlyOnce()
+    ✔ test_DifferentNamesHaveSeparatePendingEntries()
+    ✔ test_CompetingValidRevealsCountDomainOnce()
+    ✔ test_CommitDoesNotCreateNamedAuctionOrPendingDomain()
+    ✔ testFuzz_CompetingBidsCountOneDomainAndFinalizeOnce(uint96,uint96,bool) (runs: 256)
+
+  contracts/DomainRegistrarAccounting.t.sol:DomainRegistrarAccountingTest
+    ✔ test_TreasuryMayWithdrawItsPriceBeforeItsWinnerRefundIsSettled()
+    ✔ test_TreasuryMayAlsoBeWinnerAndWithdrawCombinedCreditOnce()
+    ✔ test_TreasuryAsLosingBidderReceivesItsRefundPlusWinningPrice()
+    ✔ test_RejectingWalletsDoNotBlockFinalizationOrSettlementAndCanRetryWithdrawal()
+    ✔ test_OneWeiWinningBidPreservesTheRemainingDeposit()
+    ✔ test_NoValidRevealsCreateOnlyPenaltyCreditsAndNoOwner()
+    ✔ test_FullDepositBidCanSettleWithZeroRefundAfterTreasuryWithdraws()
+    ✔ test_ExtraETHDoesNotIncreaseAnyWithdrawalEntitlement()
+    ✔ test_CreditCreatedDuringWithdrawalCallbackRemainsClaimable()
+    ✔ test_CanonicalWithdrawalCannotReenterItselfOrDomainPayments()
+    ✔ testFuzz_AccountingAcrossSettlementAndWithdrawalOrders(uint96,uint8,bool) (runs: 256)
+
+Running Mocha tests
+
+
+  Counter
+    ✔ Should emit the Increment event when calling the inc() function
+    ✔ The sum of the Increment events should match the current value
+
+  DomainRegistrar commitment
+    ✔ matches the hash calculated with ethers
+    ✔ emits a receipt for an accepted commitment
+
+  DomainRegistrar reveal
+    ✔ emits the revealed details and exposes the leading bid
+
+  DomainRegistrar ownership
+    ✔ finalizes for the winner and exposes the owner to ethers
+
+  DomainRegistrar settlement
+    ✔ requires the bidder to settle after finalization and credits the price once
+
+  DomainRegistrar withdrawals
+    ✔ pays the bidder refund and treasury proceeds
+
+  DomainRegistrar resolution
+    ✔ lets the owner update the payment address while preserving ownership
+
+  DomainRegistrar accounting
+    ✔ credits the exact winning price once and pays all three deposit outcomes (53ms)
+    ✔ keeps an unrelated newer deposit locked while older bids settle and withdraw
+    ✔ exposes the fixed configuration for historical rounds and rejects a zero treasury
+
+  DomainRegistrar auction records
+    ✔ exposes pending counts, finalization history and cleared reservations (44ms)
+    ✔ finalizes an older record without changing the newer round's count or schedule (41ms)
+
+  DomainRegistrar bid rules
+    ✔ records a locally calculated commitment with only public receipt fields
+    ✔ rejects duplicate commits across both entry points without replacing records
+    ✔ preserves exact wei and the unused record until a correct reveal succeeds
+    ✔ allows the same wallet in a later round while preserving its earlier record
+
+  DomainRegistrar payments
+    ✔ emits the exact payment and preserves the auction deposit
+    ✔ rejects a stale recipient and accepts a newly confirmed address
+
+  DomainRegistrar explicit rounds
+    ✔ waits for an explicit start and emits the recorded schedule
+    ✔ rejects overlapping starts and leaves ended rounds recorded
+    ✔ finalizes and settles an older auction while a newer round accepts bids
+
+
+  23 passing (551ms)
+
+
+176 passing (153 solidity, 23 mocha)
+

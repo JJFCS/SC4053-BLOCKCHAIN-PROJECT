@@ -1,0 +1,1037 @@
+change undici 7.30.0 => 7.30.1
+change serialize-javascript 7.1.2 => 7.1.4
+remove minimalistic-crypto-utils 1.0.1
+remove minimalistic-assert 1.0.1
+remove hmac-drbg 1.0.1
+remove hash.js 1.1.7
+change hardhat 3.18.0 => 3.21.1
+add @streamparser/json 0.0.26
+add @streamparser/json-node 0.0.26
+add @nomicfoundation/hardhat-utils 5.1.1
+remove elliptic 6.6.1
+remove bn.js 4.12.5
+remove brorand 1.1.0
+change @nomicfoundation/hardhat-zod-utils 3.0.6 => 3.0.8
+add @streamparser/json 0.0.26
+add @streamparser/json-node 0.0.26
+add @nomicfoundation/hardhat-utils 5.1.1
+change @nomicfoundation/hardhat-verify 3.1.1 => 3.1.4
+add @streamparser/json 0.0.26
+add @streamparser/json-node 0.0.26
+add @nomicfoundation/hardhat-utils 5.1.1
+change @nomicfoundation/hardhat-typechain 3.1.1 => 3.1.3
+add @streamparser/json 0.0.26
+add @streamparser/json-node 0.0.26
+add @nomicfoundation/hardhat-utils 5.1.1
+change @nomicfoundation/hardhat-network-helpers 3.0.11 => 3.0.12
+add @streamparser/json 0.0.26
+add @streamparser/json-node 0.0.26
+add @nomicfoundation/hardhat-utils 5.1.1
+change @nomicfoundation/hardhat-mocha 4.0.0 => 4.0.1
+add @streamparser/json 0.0.26
+add @streamparser/json-node 0.0.26
+add @nomicfoundation/hardhat-utils 5.1.1
+change @nomicfoundation/hardhat-keystore 3.1.0 => 3.1.2
+add @streamparser/json 0.0.26
+add @streamparser/json-node 0.0.26
+add @nomicfoundation/hardhat-utils 5.1.1
+add @noble/ciphers 2.4.0
+change @nomicfoundation/hardhat-ignition 3.1.8 => 3.1.9
+add @streamparser/json 0.0.26
+add @streamparser/json-node 0.0.26
+add @nomicfoundation/hardhat-utils 5.1.1
+change @nomicfoundation/hardhat-ethers-chai-matchers 3.0.11 => 3.0.13
+add @streamparser/json 0.0.26
+add @streamparser/json-node 0.0.26
+add @nomicfoundation/hardhat-utils 5.1.1
+change @nomicfoundation/hardhat-ethers 4.2.0 => 4.2.1
+add @streamparser/json 0.0.26
+add @streamparser/json-node 0.0.26
+add @nomicfoundation/hardhat-utils 5.1.1
+change @nomicfoundation/hardhat-errors 3.1.0 => 3.1.4
+add @streamparser/json 0.0.26
+add @streamparser/json-node 0.0.26
+add @nomicfoundation/hardhat-utils 5.1.1
+change @nomicfoundation/edr-linux-x64-gnu 0.22.0 => 0.25.0
+change @nomicfoundation/edr 0.22.0 => 0.25.0
+change @noble/hashes 2.3.0 => 2.4.0
+remove @ethersproject/web 5.8.0
+remove @ethersproject/transactions 5.8.0
+remove @ethersproject/strings 5.8.0
+remove @ethersproject/signing-key 5.8.0
+remove @ethersproject/properties 5.8.0
+remove @ethersproject/networks 5.8.0
+remove @ethersproject/hash 5.8.0
+remove @ethersproject/constants 5.8.0
+remove @ethersproject/base64 5.8.0
+remove @ethersproject/abstract-signer 5.8.0
+remove @ethersproject/abstract-provider 5.8.0
+remove @ethersproject/abi 5.8.0
+{
+  "add": [
+    {
+      "name": "@streamparser/json",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/hardhat/node_modules/@streamparser/json"
+    },
+    {
+      "name": "@streamparser/json-node",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/hardhat/node_modules/@streamparser/json-node"
+    },
+    {
+      "name": "@nomicfoundation/hardhat-utils",
+      "version": "5.1.1",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/hardhat/node_modules/@nomicfoundation/hardhat-utils"
+    },
+    {
+      "name": "@streamparser/json",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-zod-utils/node_modules/@streamparser/json"
+    },
+    {
+      "name": "@streamparser/json-node",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-zod-utils/node_modules/@streamparser/json-node"
+    },
+    {
+      "name": "@nomicfoundation/hardhat-utils",
+      "version": "5.1.1",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-zod-utils/node_modules/@nomicfoundation/hardhat-utils"
+    },
+    {
+      "name": "@streamparser/json",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-verify/node_modules/@streamparser/json"
+    },
+    {
+      "name": "@streamparser/json-node",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-verify/node_modules/@streamparser/json-node"
+    },
+    {
+      "name": "@nomicfoundation/hardhat-utils",
+      "version": "5.1.1",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-verify/node_modules/@nomicfoundation/hardhat-utils"
+    },
+    {
+      "name": "@streamparser/json",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-typechain/node_modules/@streamparser/json"
+    },
+    {
+      "name": "@streamparser/json-node",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-typechain/node_modules/@streamparser/json-node"
+    },
+    {
+      "name": "@nomicfoundation/hardhat-utils",
+      "version": "5.1.1",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-typechain/node_modules/@nomicfoundation/hardhat-utils"
+    },
+    {
+      "name": "@streamparser/json",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-network-helpers/node_modules/@streamparser/json"
+    },
+    {
+      "name": "@streamparser/json-node",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-network-helpers/node_modules/@streamparser/json-node"
+    },
+    {
+      "name": "@nomicfoundation/hardhat-utils",
+      "version": "5.1.1",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-network-helpers/node_modules/@nomicfoundation/hardhat-utils"
+    },
+    {
+      "name": "@streamparser/json",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-mocha/node_modules/@streamparser/json"
+    },
+    {
+      "name": "@streamparser/json-node",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-mocha/node_modules/@streamparser/json-node"
+    },
+    {
+      "name": "@nomicfoundation/hardhat-utils",
+      "version": "5.1.1",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-mocha/node_modules/@nomicfoundation/hardhat-utils"
+    },
+    {
+      "name": "@streamparser/json",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-keystore/node_modules/@streamparser/json"
+    },
+    {
+      "name": "@streamparser/json-node",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-keystore/node_modules/@streamparser/json-node"
+    },
+    {
+      "name": "@nomicfoundation/hardhat-utils",
+      "version": "5.1.1",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-keystore/node_modules/@nomicfoundation/hardhat-utils"
+    },
+    {
+      "name": "@noble/ciphers",
+      "version": "2.4.0",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-keystore/node_modules/@noble/ciphers"
+    },
+    {
+      "name": "@streamparser/json",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-ignition/node_modules/@streamparser/json"
+    },
+    {
+      "name": "@streamparser/json-node",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-ignition/node_modules/@streamparser/json-node"
+    },
+    {
+      "name": "@nomicfoundation/hardhat-utils",
+      "version": "5.1.1",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-ignition/node_modules/@nomicfoundation/hardhat-utils"
+    },
+    {
+      "name": "@streamparser/json",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-ethers-chai-matchers/node_modules/@streamparser/json"
+    },
+    {
+      "name": "@streamparser/json-node",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-ethers-chai-matchers/node_modules/@streamparser/json-node"
+    },
+    {
+      "name": "@nomicfoundation/hardhat-utils",
+      "version": "5.1.1",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-ethers-chai-matchers/node_modules/@nomicfoundation/hardhat-utils"
+    },
+    {
+      "name": "@streamparser/json",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-ethers/node_modules/@streamparser/json"
+    },
+    {
+      "name": "@streamparser/json-node",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-ethers/node_modules/@streamparser/json-node"
+    },
+    {
+      "name": "@nomicfoundation/hardhat-utils",
+      "version": "5.1.1",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-ethers/node_modules/@nomicfoundation/hardhat-utils"
+    },
+    {
+      "name": "@streamparser/json",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-errors/node_modules/@streamparser/json"
+    },
+    {
+      "name": "@streamparser/json-node",
+      "version": "0.0.26",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-errors/node_modules/@streamparser/json-node"
+    },
+    {
+      "name": "@nomicfoundation/hardhat-utils",
+      "version": "5.1.1",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-errors/node_modules/@nomicfoundation/hardhat-utils"
+    }
+  ],
+  "added": 34,
+  "audited": 224,
+  "change": [
+    {
+      "from": {
+        "name": "undici",
+        "version": "7.30.0",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/undici"
+      },
+      "to": {
+        "name": "undici",
+        "version": "7.30.1",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/undici"
+      }
+    },
+    {
+      "from": {
+        "name": "serialize-javascript",
+        "version": "7.1.2",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/serialize-javascript"
+      },
+      "to": {
+        "name": "serialize-javascript",
+        "version": "7.1.4",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/serialize-javascript"
+      }
+    },
+    {
+      "from": {
+        "name": "hardhat",
+        "version": "3.18.0",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/hardhat"
+      },
+      "to": {
+        "name": "hardhat",
+        "version": "3.21.1",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/hardhat"
+      }
+    },
+    {
+      "from": {
+        "name": "@nomicfoundation/hardhat-zod-utils",
+        "version": "3.0.6",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-zod-utils"
+      },
+      "to": {
+        "name": "@nomicfoundation/hardhat-zod-utils",
+        "version": "3.0.8",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-zod-utils"
+      }
+    },
+    {
+      "from": {
+        "name": "@nomicfoundation/hardhat-verify",
+        "version": "3.1.1",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-verify"
+      },
+      "to": {
+        "name": "@nomicfoundation/hardhat-verify",
+        "version": "3.1.4",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-verify"
+      }
+    },
+    {
+      "from": {
+        "name": "@nomicfoundation/hardhat-typechain",
+        "version": "3.1.1",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-typechain"
+      },
+      "to": {
+        "name": "@nomicfoundation/hardhat-typechain",
+        "version": "3.1.3",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-typechain"
+      }
+    },
+    {
+      "from": {
+        "name": "@nomicfoundation/hardhat-network-helpers",
+        "version": "3.0.11",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-network-helpers"
+      },
+      "to": {
+        "name": "@nomicfoundation/hardhat-network-helpers",
+        "version": "3.0.12",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-network-helpers"
+      }
+    },
+    {
+      "from": {
+        "name": "@nomicfoundation/hardhat-mocha",
+        "version": "4.0.0",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-mocha"
+      },
+      "to": {
+        "name": "@nomicfoundation/hardhat-mocha",
+        "version": "4.0.1",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-mocha"
+      }
+    },
+    {
+      "from": {
+        "name": "@nomicfoundation/hardhat-keystore",
+        "version": "3.1.0",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-keystore"
+      },
+      "to": {
+        "name": "@nomicfoundation/hardhat-keystore",
+        "version": "3.1.2",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-keystore"
+      }
+    },
+    {
+      "from": {
+        "name": "@nomicfoundation/hardhat-ignition",
+        "version": "3.1.8",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-ignition"
+      },
+      "to": {
+        "name": "@nomicfoundation/hardhat-ignition",
+        "version": "3.1.9",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-ignition"
+      }
+    },
+    {
+      "from": {
+        "name": "@nomicfoundation/hardhat-ethers-chai-matchers",
+        "version": "3.0.11",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-ethers-chai-matchers"
+      },
+      "to": {
+        "name": "@nomicfoundation/hardhat-ethers-chai-matchers",
+        "version": "3.0.13",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-ethers-chai-matchers"
+      }
+    },
+    {
+      "from": {
+        "name": "@nomicfoundation/hardhat-ethers",
+        "version": "4.2.0",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-ethers"
+      },
+      "to": {
+        "name": "@nomicfoundation/hardhat-ethers",
+        "version": "4.2.1",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-ethers"
+      }
+    },
+    {
+      "from": {
+        "name": "@nomicfoundation/hardhat-errors",
+        "version": "3.1.0",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-errors"
+      },
+      "to": {
+        "name": "@nomicfoundation/hardhat-errors",
+        "version": "3.1.4",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/hardhat-errors"
+      }
+    },
+    {
+      "from": {
+        "name": "@nomicfoundation/edr-linux-x64-gnu",
+        "version": "0.22.0",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/edr-linux-x64-gnu"
+      },
+      "to": {
+        "name": "@nomicfoundation/edr-linux-x64-gnu",
+        "version": "0.25.0",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/edr-linux-x64-gnu"
+      }
+    },
+    {
+      "from": {
+        "name": "@nomicfoundation/edr",
+        "version": "0.22.0",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/edr"
+      },
+      "to": {
+        "name": "@nomicfoundation/edr",
+        "version": "0.25.0",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@nomicfoundation/edr"
+      }
+    },
+    {
+      "from": {
+        "name": "@noble/hashes",
+        "version": "2.3.0",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@noble/hashes"
+      },
+      "to": {
+        "name": "@noble/hashes",
+        "version": "2.4.0",
+        "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@noble/hashes"
+      }
+    }
+  ],
+  "changed": 16,
+  "funding": 0,
+  "remove": [
+    {
+      "name": "minimalistic-crypto-utils",
+      "version": "1.0.1",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/minimalistic-crypto-utils"
+    },
+    {
+      "name": "minimalistic-assert",
+      "version": "1.0.1",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/minimalistic-assert"
+    },
+    {
+      "name": "hmac-drbg",
+      "version": "1.0.1",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/hmac-drbg"
+    },
+    {
+      "name": "hash.js",
+      "version": "1.1.7",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/hash.js"
+    },
+    {
+      "name": "elliptic",
+      "version": "6.6.1",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/elliptic"
+    },
+    {
+      "name": "bn.js",
+      "version": "4.12.5",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/elliptic/node_modules/bn.js"
+    },
+    {
+      "name": "brorand",
+      "version": "1.1.0",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/brorand"
+    },
+    {
+      "name": "@ethersproject/web",
+      "version": "5.8.0",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@ethersproject/web"
+    },
+    {
+      "name": "@ethersproject/transactions",
+      "version": "5.8.0",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@ethersproject/transactions"
+    },
+    {
+      "name": "@ethersproject/strings",
+      "version": "5.8.0",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@ethersproject/strings"
+    },
+    {
+      "name": "@ethersproject/signing-key",
+      "version": "5.8.0",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@ethersproject/signing-key"
+    },
+    {
+      "name": "@ethersproject/properties",
+      "version": "5.8.0",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@ethersproject/properties"
+    },
+    {
+      "name": "@ethersproject/networks",
+      "version": "5.8.0",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@ethersproject/networks"
+    },
+    {
+      "name": "@ethersproject/hash",
+      "version": "5.8.0",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@ethersproject/hash"
+    },
+    {
+      "name": "@ethersproject/constants",
+      "version": "5.8.0",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@ethersproject/constants"
+    },
+    {
+      "name": "@ethersproject/base64",
+      "version": "5.8.0",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@ethersproject/base64"
+    },
+    {
+      "name": "@ethersproject/abstract-signer",
+      "version": "5.8.0",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@ethersproject/abstract-signer"
+    },
+    {
+      "name": "@ethersproject/abstract-provider",
+      "version": "5.8.0",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@ethersproject/abstract-provider"
+    },
+    {
+      "name": "@ethersproject/abi",
+      "version": "5.8.0",
+      "path": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/node_modules/@ethersproject/abi"
+    }
+  ],
+  "removed": 19,
+  "audit": {
+    "auditReportVersion": 2,
+    "vulnerabilities": {
+      "@ethersproject/abi": {
+        "name": "@ethersproject/abi",
+        "severity": "low",
+        "isDirect": false,
+        "via": [
+          "@ethersproject/hash"
+        ],
+        "effects": [
+          "@nomicfoundation/hardhat-verify"
+        ],
+        "range": "5.0.10 - 5.8.0",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "@ethersproject/abstract-provider": {
+        "name": "@ethersproject/abstract-provider",
+        "severity": "low",
+        "isDirect": false,
+        "via": [
+          "@ethersproject/transactions"
+        ],
+        "effects": [
+          "@ethersproject/abstract-signer"
+        ],
+        "range": "*",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "@ethersproject/abstract-signer": {
+        "name": "@ethersproject/abstract-signer",
+        "severity": "low",
+        "isDirect": false,
+        "via": [
+          "@ethersproject/abstract-provider"
+        ],
+        "effects": [
+          "@ethersproject/hash"
+        ],
+        "range": "*",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "@ethersproject/hash": {
+        "name": "@ethersproject/hash",
+        "severity": "low",
+        "isDirect": false,
+        "via": [
+          "@ethersproject/abstract-signer"
+        ],
+        "effects": [
+          "@ethersproject/abi"
+        ],
+        "range": "5.0.6 - 5.8.0",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "@ethersproject/signing-key": {
+        "name": "@ethersproject/signing-key",
+        "severity": "low",
+        "isDirect": false,
+        "via": [
+          "elliptic"
+        ],
+        "effects": [
+          "@ethersproject/transactions"
+        ],
+        "range": "<=5.8.0",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "@ethersproject/transactions": {
+        "name": "@ethersproject/transactions",
+        "severity": "low",
+        "isDirect": false,
+        "via": [
+          "@ethersproject/signing-key"
+        ],
+        "effects": [
+          "@ethersproject/abstract-provider"
+        ],
+        "range": "<=5.8.0",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "@nomicfoundation/hardhat-ethers": {
+        "name": "@nomicfoundation/hardhat-ethers",
+        "severity": "high",
+        "isDirect": true,
+        "via": [
+          "@nomicfoundation/hardhat-zod-utils",
+          "hardhat",
+          "zod"
+        ],
+        "effects": [],
+        "range": ">=4.0.0-next.0",
+        "nodes": [
+          "",
+          "node_modules/@nomicfoundation/hardhat-ethers"
+        ],
+        "fixAvailable": {
+          "name": "@nomicfoundation/hardhat-ethers",
+          "version": "4.0.13",
+          "isSemVerMajor": true
+        }
+      },
+      "@nomicfoundation/hardhat-ethers-chai-matchers": {
+        "name": "@nomicfoundation/hardhat-ethers-chai-matchers",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          "hardhat"
+        ],
+        "effects": [],
+        "range": "*",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "@nomicfoundation/hardhat-ignition": {
+        "name": "@nomicfoundation/hardhat-ignition",
+        "severity": "high",
+        "isDirect": true,
+        "via": [
+          "@nomicfoundation/hardhat-verify",
+          "hardhat"
+        ],
+        "effects": [],
+        "range": ">=3.0.0-next.0",
+        "nodes": [
+          "",
+          "node_modules/@nomicfoundation/hardhat-ignition"
+        ],
+        "fixAvailable": {
+          "name": "@nomicfoundation/hardhat-ignition",
+          "version": "0.15.16",
+          "isSemVerMajor": true
+        }
+      },
+      "@nomicfoundation/hardhat-ignition-ethers": {
+        "name": "@nomicfoundation/hardhat-ignition-ethers",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          "@nomicfoundation/hardhat-ignition",
+          "@nomicfoundation/hardhat-verify",
+          "hardhat"
+        ],
+        "effects": [],
+        "range": ">=3.0.0-next.0",
+        "nodes": [
+          "node_modules/@nomicfoundation/hardhat-ignition-ethers"
+        ],
+        "fixAvailable": true
+      },
+      "@nomicfoundation/hardhat-keystore": {
+        "name": "@nomicfoundation/hardhat-keystore",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          "@nomicfoundation/hardhat-zod-utils",
+          "hardhat",
+          "zod"
+        ],
+        "effects": [],
+        "range": "*",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "@nomicfoundation/hardhat-mocha": {
+        "name": "@nomicfoundation/hardhat-mocha",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          "@nomicfoundation/hardhat-zod-utils",
+          "hardhat",
+          "zod"
+        ],
+        "effects": [],
+        "range": "*",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "@nomicfoundation/hardhat-network-helpers": {
+        "name": "@nomicfoundation/hardhat-network-helpers",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          "hardhat"
+        ],
+        "effects": [],
+        "range": ">=3.0.0-next.0",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "@nomicfoundation/hardhat-toolbox-mocha-ethers": {
+        "name": "@nomicfoundation/hardhat-toolbox-mocha-ethers",
+        "severity": "high",
+        "isDirect": true,
+        "via": [
+          "@nomicfoundation/hardhat-ethers-chai-matchers",
+          "@nomicfoundation/hardhat-ignition",
+          "@nomicfoundation/hardhat-ignition-ethers",
+          "@nomicfoundation/hardhat-keystore",
+          "@nomicfoundation/hardhat-mocha",
+          "@nomicfoundation/hardhat-network-helpers",
+          "@nomicfoundation/hardhat-typechain",
+          "@nomicfoundation/hardhat-verify",
+          "hardhat"
+        ],
+        "effects": [],
+        "range": "*",
+        "nodes": [
+          "node_modules/@nomicfoundation/hardhat-toolbox-mocha-ethers"
+        ],
+        "fixAvailable": false
+      },
+      "@nomicfoundation/hardhat-typechain": {
+        "name": "@nomicfoundation/hardhat-typechain",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          "@nomicfoundation/hardhat-zod-utils",
+          "hardhat",
+          "zod"
+        ],
+        "effects": [
+          "@nomicfoundation/hardhat-toolbox-mocha-ethers"
+        ],
+        "range": "*",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": false
+      },
+      "@nomicfoundation/hardhat-verify": {
+        "name": "@nomicfoundation/hardhat-verify",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          "@ethersproject/abi",
+          "@nomicfoundation/hardhat-zod-utils",
+          "hardhat",
+          "zod"
+        ],
+        "effects": [],
+        "range": "*",
+        "nodes": [
+          "",
+          "node_modules/@nomicfoundation/hardhat-verify"
+        ],
+        "fixAvailable": true
+      },
+      "@nomicfoundation/hardhat-zod-utils": {
+        "name": "@nomicfoundation/hardhat-zod-utils",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          "zod"
+        ],
+        "effects": [],
+        "range": "*",
+        "nodes": [
+          "",
+          "node_modules/@nomicfoundation/hardhat-zod-utils"
+        ],
+        "fixAvailable": true
+      },
+      "elliptic": {
+        "name": "elliptic",
+        "severity": "low",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1112030,
+            "name": "elliptic",
+            "dependency": "elliptic",
+            "title": "Elliptic Uses a Cryptographic Primitive with a Risky Implementation",
+            "url": "https://github.com/advisories/GHSA-848j-6mx2-7j84",
+            "severity": "low",
+            "cwe": [
+              "CWE-1240"
+            ],
+            "cvss": {
+              "score": 5.6,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:L"
+            },
+            "range": "<=6.6.1"
+          }
+        ],
+        "effects": [
+          "@ethersproject/signing-key"
+        ],
+        "range": "*",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "hardhat": {
+        "name": "hardhat",
+        "severity": "high",
+        "isDirect": true,
+        "via": [
+          "@nomicfoundation/hardhat-zod-utils",
+          "zod"
+        ],
+        "effects": [
+          "@nomicfoundation/hardhat-ethers",
+          "@nomicfoundation/hardhat-ethers-chai-matchers",
+          "@nomicfoundation/hardhat-ignition",
+          "@nomicfoundation/hardhat-ignition-ethers",
+          "@nomicfoundation/hardhat-network-helpers"
+        ],
+        "range": ">=3.0.0-next.0",
+        "nodes": [
+          "",
+          "node_modules/hardhat"
+        ],
+        "fixAvailable": {
+          "name": "hardhat",
+          "version": "2.29.1",
+          "isSemVerMajor": true
+        }
+      },
+      "serialize-javascript": {
+        "name": "serialize-javascript",
+        "severity": "low",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1243082,
+            "name": "serialize-javascript",
+            "dependency": "serialize-javascript",
+            "title": "Serialize JavaScript: Cross-site scripting (XSS) via unescaped </script at the end of a serialized function body",
+            "url": "https://github.com/advisories/GHSA-m5mm-p8h7-m29v",
+            "severity": "low",
+            "cwe": [
+              "CWE-79"
+            ],
+            "cvss": {
+              "score": 0,
+              "vectorString": null
+            },
+            "range": "<7.1.3"
+          }
+        ],
+        "effects": [],
+        "range": "<7.1.3",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "undici": {
+        "name": "undici",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1243078,
+            "name": "undici",
+            "dependency": "undici",
+            "title": "undici vulnerable to Denial of Service via unbounded memory in the EventSource parser",
+            "url": "https://github.com/advisories/GHSA-4qv8-2p9j-2685",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-770"
+            ],
+            "cvss": {
+              "score": 5.9,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+            },
+            "range": ">=7.0.0 <7.30.1"
+          },
+          {
+            "source": 1243081,
+            "name": "undici",
+            "dependency": "undici",
+            "title": "undici vulnerable to Subresource Integrity bypass via non-lowercase algorithm tokens",
+            "url": "https://github.com/advisories/GHSA-f72v-6w45-q472",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-178"
+            ],
+            "cvss": {
+              "score": 5.9,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N"
+            },
+            "range": ">=7.15.0 <7.30.1"
+          },
+          {
+            "source": 1243113,
+            "name": "undici",
+            "dependency": "undici",
+            "title": "undici vulnerable to Denial of Service via unhandled error on excessive content-encodings",
+            "url": "https://github.com/advisories/GHSA-xjj6-f33q-929c",
+            "severity": "high",
+            "cwe": [
+              "CWE-248",
+              "CWE-459"
+            ],
+            "cvss": {
+              "score": 7.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+            },
+            "range": ">=7.18.0 <7.30.1"
+          }
+        ],
+        "effects": [],
+        "range": "7.0.0 - 7.30.0",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "zod": {
+        "name": "zod",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1243066,
+            "name": "zod",
+            "dependency": "zod",
+            "title": "Zod can exhaust memory while validating oversized constrained collections",
+            "url": "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+            "severity": "high",
+            "cwe": [
+              "CWE-770"
+            ],
+            "cvss": {
+              "score": 7.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+            },
+            "range": "<4.6.6"
+          }
+        ],
+        "effects": [
+          "@nomicfoundation/hardhat-ethers",
+          "@nomicfoundation/hardhat-keystore",
+          "@nomicfoundation/hardhat-mocha",
+          "@nomicfoundation/hardhat-typechain",
+          "@nomicfoundation/hardhat-verify",
+          "@nomicfoundation/hardhat-zod-utils",
+          "hardhat"
+        ],
+        "range": "<4.6.6",
+        "nodes": [
+          "node_modules/zod"
+        ],
+        "fixAvailable": {
+          "name": "@nomicfoundation/hardhat-ethers",
+          "version": "4.0.13",
+          "isSemVerMajor": true
+        }
+      }
+    },
+    "metadata": {
+      "vulnerabilities": {
+        "info": 0,
+        "low": 8,
+        "moderate": 0,
+        "high": 14,
+        "critical": 0,
+        "total": 22
+      },
+      "dependencies": {
+        "prod": 1,
+        "dev": 223,
+        "optional": 9,
+        "peer": 80,
+        "peerOptional": 0,
+        "total": 223
+      }
+    }
+  }
+}

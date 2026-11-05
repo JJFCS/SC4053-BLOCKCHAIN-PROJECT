@@ -1,0 +1,22 @@
+{
+  "name": "frontend-latest-build",
+  "cwd": "/workspace/scratch/4c4b9c84e144/tmp/frontend_latest_16decbd/frontend",
+  "command": [
+    "npm",
+    "run",
+    "build"
+  ],
+  "startedAt": "2026-10-27T05:29:15.457261+00:00",
+  "endedAt": "2026-10-27T05:29:17.643850+00:00",
+  "exitCode": 2
+}
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> frontend@0.0.0 build
+> tsc -b && vite build
+
+src/components/ntu/RoundSection.tsx(2,5): error TS6133: 'Clock3' is declared but its value is never read.
+src/components/ui/button.tsx(1,43): error TS2307: Cannot find module '@base-ui/react/button' or its corresponding type declarations.
+src/components/ui/button.tsx(2,40): error TS2307: Cannot find module 'class-variance-authority' or its corresponding type declarations.
+src/components/ui/button.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.

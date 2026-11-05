@@ -1,75 +1,30 @@
-# React + TypeScript + Vite
+# .ntu web app
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This React/Vite app connects a MetaMask wallet to the `DomainRegistrar`
+contract. It supports name search, sealed bids and reveals, finalization,
+settlement, resolution updates and ETH payments by name.
 
-Currently, two official plugins are available:
+## Run and build
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Use Node.js 26 as specified by the repository's `.nvmrc`. From this directory:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```sh
+npm ci
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Open the URL printed by Vite. To check the production build, run
+`npm run build`. The root [README](../README.md) gives the complete local
+Hardhat, deployment, MetaMask and Sepolia setup.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+The registrar deployment script writes `VITE_REGISTRAR_ADDRESS` and
+`VITE_CHAIN_ID` to `.env.local`; `.env.example` lists the required variable
+names. Select that same chain for this site in MetaMask. The frontend keeps
+the contract signatures it calls in `src/components/ntu/handlers.ts`; compare
+them with `../contracts/abi/DomainRegistrar.json` when contract code changes.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
+Keep downloaded reveal backups safe until their bids have been revealed. They
+contain the bid and salt; do not commit them, wallet credentials or `.env.local`
+to Git. Browser results and known findings are recorded in
+[`BROWSER_ACCEPTANCE.md`](../docs/BROWSER_ACCEPTANCE.md) and
+[`FRONTEND_FINDINGS.md`](../docs/FRONTEND_FINDINGS.md).

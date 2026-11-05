@@ -1,0 +1,75 @@
+{
+  "source": "SC4053-complete-repo.zip / SC4053-all-branches.bundle",
+  "archiveSha256": "7f104015fba7ee5ea5b69922376ab2a750ee19c5b05c2510ec34425f6220d2c5",
+  "workingTreeAtExport": "user supplied git status showed clean main...origin/main",
+  "mainRevision": "cb1f3c4b5bbc04326804089d30991dc69c6a2f60",
+  "integrationBase": "16decbda349a26e0a8bd44eb4e216b6edd2e4b70",
+  "contractFilesDifferBetweenMainAndIntegrationBase": false,
+  "branches": [
+    {
+      "branch": "origin/feature/frontend-wallet",
+      "revision": "16decbda349a26e0a8bd44eb4e216b6edd2e4b70",
+      "includedInMain": false
+    },
+    {
+      "branch": "origin/main",
+      "revision": "cb1f3c4b5bbc04326804089d30991dc69c6a2f60",
+      "includedInMain": true
+    },
+    {
+      "branch": "origin/onncera/registra-accounting",
+      "revision": "43fd4433b88c64712afcead3124be6710ed408f9",
+      "includedInMain": true
+    },
+    {
+      "branch": "origin/onncera/registra-auction-records",
+      "revision": "f0a746de061e1c4d74835f5d5a4a00ccc1461ac6",
+      "includedInMain": true
+    },
+    {
+      "branch": "origin/onncera/registra-bid-rules",
+      "revision": "473ac597e842725d7a06d890d0d53c9348a7ac6a",
+      "includedInMain": true
+    },
+    {
+      "branch": "origin/onncera/registra-commitments",
+      "revision": "69c2e5e7d7670507bcb99bc81414fdc25a93d117",
+      "includedInMain": true
+    },
+    {
+      "branch": "origin/onncera/registra-foundation",
+      "revision": "79e3c95d911458f25a4b3afa7df98e1b8200ccb7",
+      "includedInMain": true
+    },
+    {
+      "branch": "origin/onncera/registra-ownership",
+      "revision": "f5f8178afd1ee9149aabca832931f0da846d68a7",
+      "includedInMain": true
+    },
+    {
+      "branch": "origin/onncera/registra-payments",
+      "revision": "70177ec2d45571b4680be234d0e5ac9329c06ce5",
+      "includedInMain": true
+    },
+    {
+      "branch": "origin/onncera/registra-resolution",
+      "revision": "badd105b634889be4acb951a2bfb9c00ba54d836",
+      "includedInMain": true
+    },
+    {
+      "branch": "origin/onncera/registra-reveal",
+      "revision": "ecfbbd1f52f404542ca36fb704382da7c788c2be",
+      "includedInMain": true
+    },
+    {
+      "branch": "origin/onncera/registra-rounds",
+      "revision": "1ca74bd2b1b566c90e74aa186221223ccfafc232",
+      "includedInMain": true
+    },
+    {
+      "branch": "origin/onncera/registra-settlement",
+      "revision": "14a35ea97eee78f8827c28460f10d3007b1e6e97",
+      "includedInMain": true
+    }
+  ]
+}

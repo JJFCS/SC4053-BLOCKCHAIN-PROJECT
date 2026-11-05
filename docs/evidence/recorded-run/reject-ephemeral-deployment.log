@@ -1,0 +1,21 @@
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+An unexpected error occurred:
+
+AssertionError [ERR_ASSERTION]: Use --network localhost or --network sepolia; an ephemeral deployment cannot serve the UI
++ actual - expected
+
++ 'edr-simulated'
+- 'http'
+
+    at assertHttpNetwork (/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/scripts/lib/deployment.ts:108:10)
+    at <anonymous> (/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts/scripts/deploy-registrar.ts:11:3) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 'edr-simulated',
+  expected: 'http',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+If you think this is a bug in Hardhat, please report it here: https://hardhat.org/report-bug

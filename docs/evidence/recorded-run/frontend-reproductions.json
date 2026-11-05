@@ -1,0 +1,14 @@
+{
+  "name": "frontend-reproductions",
+  "cwd": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts",
+  "command": [
+    "npx",
+    "--no-install",
+    "hardhat",
+    "run",
+    "scripts/audit-frontend.ts"
+  ],
+  "startedAt": "2026-10-27T04:51:36.633608+00:00",
+  "endedAt": "2026-10-27T04:51:38.563603+00:00",
+  "exitCode": 0
+}

@@ -1,0 +1,15 @@
+{
+  "name": "fresh-locked-install",
+  "cwd": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts",
+  "command": [
+    "npm",
+    "ci",
+    "--no-audit",
+    "--no-fund",
+    "--fetch-retries=0",
+    "--fetch-timeout=20000"
+  ],
+  "startedAt": "2026-10-27T05:04:26.014800+00:00",
+  "endedAt": "2026-10-27T05:04:36.825437+00:00",
+  "exitCode": 0
+}
