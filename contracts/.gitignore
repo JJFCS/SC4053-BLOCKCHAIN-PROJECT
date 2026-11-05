@@ -27,5 +27,12 @@
 # Gas snapshot files
 /.gas-snapshot
 
+# Generated audit harness modules
+/.audit-cache
+
+# Local node addresses are regenerated after a reset; public testnet records may be committed.
+/deployments/31337.json
+/deployments/31337/
+
 # Snapshot cheatcodes output
 /snapshots
