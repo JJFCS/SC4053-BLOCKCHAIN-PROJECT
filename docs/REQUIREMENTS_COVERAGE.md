@@ -45,11 +45,11 @@ are identified in BROWSER_ACCEPTANCE.md.
 | Search, bid/reveal UI and ETH payments by name | Current frontend implements the main screens; handler tests and local browser checks verified the key flows. Findings are recorded in `FRONTEND_FINDINGS.md`. |
 | Short test phases and non-reveal policy | 120/120 seconds and 0.001 ETH penalty implemented and exercised. |
 | Specification and validation tooling | Specification and validation workflow documented; available AI workflow evidence is described in the audit report. |
-| Eight-section AI Audit Report and major-issue evidence | Report and evidence updated through 5 November; code PR #12 merged as `cc7e309`. This documentation awaits its separate PR. |
+| Eight-section AI Audit Report and major-issue evidence | Report and evidence updated through 5 November; code PR #12 and documentation PR #13 merged into main as `cc7e309` and `4006260`, respectively. |
 | Complete reproducible code ZIP and README | Clean local command-line setup passed on final code revision; assemble the final code package for submission. |
 | Demo video at most 10 minutes, architecture and deployed demonstration | Not recorded in this workflow. |
 | Individual peer evaluation | Each member must complete the course process. |
 | Reverse resolution | Optional bonus; not treated as a missing baseline feature. |
 
-This checklist covers the supplied brief and specification. It does not replace
-checking later course announcements or capture commits made after this bundle.
+This checklist covers the supplied brief and specification. Check later course
+announcements and any code changes made after the recorded validation runs.

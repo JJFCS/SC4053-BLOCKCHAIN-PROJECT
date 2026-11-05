@@ -43,7 +43,7 @@ their outputs were supplied separately on 27 October.
 | Frontend locked install | Passed. |
 | Current frontend production build | Failed before repair (unused icon plus unresolved orphan component); passed after the two-file build repair. |
 | Historical frontend runtime probes | Five issues reproduced in 7217ac7 only. |
-| Current frontend handler checks | FE-02 through FE-05 fixed/verified; checked payment path verified, with confirmation UI still open. |
+| Current frontend handler checks | Initial snapshot: FE-02 through FE-05 fixed/verified; payment confirmation UI remained open then and was checked in the later browser runs below. |
 | Browser/storage/wallet acceptance | Separate manual browser results are recorded below and in `BROWSER_ACCEPTANCE.md`. |
 
 The totals include five Counter example tests; the expanded registrar-specific
@@ -271,10 +271,10 @@ migration was included in `e63143b`.
 
 ## Final release checks
 
-- Merge this separate report and acceptance evidence branch, then assemble
-  the final code package and demo video. Code PR #12 is merged; the local
-  final-revision frontend matched its deployed ABI, address and chain. Public
-  Sepolia browser behaviour was not checked here.
+- Assemble the final code package and demo video. Code PR #12 and documentation
+  PR #13 are merged into main as `cc7e309` and `4006260`, respectively. The
+  local final-revision frontend matched its deployed ABI, address and chain.
+  Public Sepolia browser behaviour was not checked here.
 - Retain the documented development-tool advisory finding unless a compatible
   update is applied and validated. The dated 1 November audit reported 13
   high/5 moderate affected entries; the later Windows install counts are
