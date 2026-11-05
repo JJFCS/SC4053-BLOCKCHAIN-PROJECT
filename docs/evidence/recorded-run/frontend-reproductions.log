@@ -1,0 +1,63 @@
+{
+  "name": "frontend-reproductions",
+  "cwd": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts",
+  "command": [
+    "npx",
+    "--no-install",
+    "hardhat",
+    "run",
+    "scripts/audit-frontend.ts"
+  ],
+  "startedAt": "2026-10-27T04:51:36.633608+00:00",
+  "endedAt": "2026-10-27T04:51:38.563603+00:00",
+  "exitCode": 0
+}
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+Payment submitted: 0x3eefe885becd79039569c6a75ca7feed6e5ea790d8a81f7d5deef1308a8b87e2
+{
+  "recordedAt": "2026-10-27T04:51:38.291Z",
+  "contractRevision": "cb1f3c4b5bbc04326804089d30991dc69c6a2f60",
+  "frontendRevision": "7217ac7cd96be3813ba372c75f2bf3f8e042e9c2",
+  "fixtureSha256": "8ed63a820135cac8f7c079546885470f27409c321c41edb14d3621d138a0783a",
+  "method": "Original handlers transpiled with deployment configuration; BrowserProvider uses an EIP-1193 bridge to the real simulated EVM. No browser or MetaMask UI was exercised.",
+  "contractSourceChanged": false,
+  "findings": [
+    {
+      "id": "FE-02",
+      "status": "reproduced-open",
+      "observation": "Frontend accepts a two-character name that the current registrar rejects",
+      "frontendAccepted": true,
+      "contractAccepted": false
+    },
+    {
+      "id": "FE-03",
+      "status": "reproduced-open",
+      "observation": "Fresh deployment has round ID 0; frontend calls getRound(0) and reverts"
+    },
+    {
+      "id": "FE-04",
+      "status": "reproduced-open",
+      "observation": "Revealed, unfinalized name is displayed as available after the reveal deadline",
+      "actualReservedRound": "1",
+      "frontendStatus": "available"
+    },
+    {
+      "id": "FE-05",
+      "status": "reproduced-open",
+      "observation": "Frontend displays the resolution recipient as the domain owner",
+      "actualOwner": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "displayedOwner": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65"
+    },
+    {
+      "id": "FE-06",
+      "status": "reproduced-open",
+      "observation": "Legacy direct transfer succeeds to the old recipient after resolution changes; the checked registrar call rejects the stale recipient",
+      "transactionHash": "0x3eefe885becd79039569c6a75ca7feed6e5ea790d8a81f7d5deef1308a8b87e2",
+      "transactionTo": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+      "currentResolution": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"
+    }
+  ]
+}
+Five OPEN frontend issues reproduced. These results are not frontend acceptance passes.

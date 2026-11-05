@@ -1,0 +1,12 @@
+{
+  "name": "integration-validation",
+  "cwd": "/workspace/scratch/4c4b9c84e144/work/sc4053-c/contracts",
+  "command": [
+    "npm",
+    "run",
+    "validate"
+  ],
+  "startedAt": "2026-10-27T05:40:04.579350+00:00",
+  "endedAt": "2026-10-27T05:40:09.018348+00:00",
+  "exitCode": 0
+}

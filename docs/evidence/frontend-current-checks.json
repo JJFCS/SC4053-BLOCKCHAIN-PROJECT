@@ -1,0 +1,35 @@
+{
+  "recordedAt": "2026-10-27T05:29:15.907Z",
+  "frontendRevision": "16decbda349a26e0a8bd44eb4e216b6edd2e4b70",
+  "fixtureSha256": "46ee0deb4c05f32eee7e3fa9eadc3b2c168b15739d72e3b590a67a50029b9dc3",
+  "method": "Unmodified current handlers, configured and transpiled, executed through BrowserProvider and an EIP-1193 bridge to the simulated EVM. No React or MetaMask UI exercised.",
+  "checks": [
+    {
+      "finding": "FE-02",
+      "result": "fixed-and-verified",
+      "observation": "Two-character labels rejected; valid label accepted"
+    },
+    {
+      "finding": "FE-03",
+      "result": "fixed-and-verified",
+      "observation": "Fresh deployment returns null without querying round 0"
+    },
+    {
+      "finding": "FE-04",
+      "result": "fixed-and-verified",
+      "observation": "Ended reserved domain keeps its original reservation and is not shown as available"
+    },
+    {
+      "finding": "FE-05",
+      "result": "fixed-and-verified",
+      "observation": "Owner and resolution recipient are returned separately"
+    },
+    {
+      "finding": "FE-06",
+      "result": "contract-path-fixed-and-verified",
+      "observation": "Payment uses registrar; stale recipient pays neither address; a separate fresh call succeeds",
+      "transactionHash": "0xb3976e779bd661b7fbafc19fed2bdb261762962eef5a7ad096b8e0454d61f100",
+      "remaining": "User preview and explicit recipient/network confirmation still require UI changes and browser acceptance"
+    }
+  ]
+}
