@@ -60,13 +60,6 @@ import {
   ============================================================
   RECOVERY STORAGE
   ============================================================
-
-  One record is namespaced by:
-
-  chain
-  + registrar
-  + bidder
-  + round
 */
 
 const STORAGE_PREFIX =
@@ -111,13 +104,6 @@ function persistCommitment(
     return
   }
 
-  /*
-    localStorage is synchronous.
-
-    This is deliberately called BEFORE the MetaMask
-    transaction request.
-  */
-
   localStorage.setItem(
     key,
     JSON.stringify(
@@ -131,22 +117,54 @@ Commitment[] {
   const records:
     Commitment[] = []
 
-  const remember = (value: Commitment & { submissionFailed?: boolean }) => {
-    if (!value || typeof value.hash !== "string") return
-    const record: Commitment = {
-      ...value,
-      submissionStatus: value.submissionStatus ??
-        (value.submissionFailed ? "failed" : value.commitmentId ? "confirmed" : value.txHash ? "pending" : "prepared"),
+  const remember = (
+    value:
+      Commitment & {
+        submissionFailed?: boolean
+      }
+  ) => {
+    if (
+      !value ||
+      typeof value.hash !==
+        "string"
+    ) {
+      return
     }
-    const index = records.findIndex((existing) =>
-      existing.hash.toLowerCase() === record.hash.toLowerCase())
-    if (index < 0) records.push(record)
-    else records[index] = mergeRecoveredCommitment(records[index], record)
-  }
 
-  /*
-    Load the new context-specific records.
-  */
+    const record:
+      Commitment = {
+        ...value,
+
+        submissionStatus:
+          value.submissionStatus ??
+          (
+            value.submissionFailed
+              ? "failed"
+              : value.commitmentId
+                ? "confirmed"
+                : value.txHash
+                  ? "pending"
+                  : "prepared"
+          ),
+      }
+
+    const index =
+      records.findIndex(
+        (existing) =>
+          existing.hash.toLowerCase() ===
+          record.hash.toLowerCase()
+      )
+
+    if (index < 0) {
+      records.push(record)
+    } else {
+      records[index] =
+        mergeRecoveredCommitment(
+          records[index],
+          record
+        )
+    }
+  }
 
   for (
     let index = 0;
@@ -159,8 +177,17 @@ Commitment[] {
         index
       )
 
-      if (!key || (!key.startsWith(`${STORAGE_PREFIX}:`) &&
-          !key.startsWith(PREVIOUS_STORAGE_PREFIX))) {
+    if (
+      !key ||
+      (
+        !key.startsWith(
+          `${STORAGE_PREFIX}:`
+        ) &&
+        !key.startsWith(
+          PREVIOUS_STORAGE_PREFIX
+        )
+      )
+    ) {
       continue
     }
 
@@ -188,12 +215,6 @@ Commitment[] {
     }
   }
 
-  /*
-    Preserve legacy records.
-
-    We DO NOT invent missing chain or registrar context.
-  */
-
   try {
     const legacy =
       localStorage.getItem(
@@ -212,7 +233,8 @@ Commitment[] {
         )
       ) {
         for (
-          const record of parsed
+          const record of
+          parsed
         ) {
           remember(record)
         }
@@ -324,11 +346,6 @@ function mergeRecoveredCommitment(
   incoming:
     Commitment
 ): Commitment {
-  /*
-    Same wallet + round should never silently change
-    to a different commitment preimage.
-  */
-
   if (
     existing.hash.toLowerCase() !==
     incoming.hash.toLowerCase()
@@ -355,10 +372,6 @@ function mergeRecoveredCommitment(
       : existing.submissionStatus ??
         incoming.submissionStatus
 
-  /*
-    Preserve the earliest known timestamp.
-  */
-
   const createdAt =
     Math.min(
       existing.createdAt ||
@@ -371,11 +384,6 @@ function mergeRecoveredCommitment(
     ...incoming,
 
     createdAt,
-
-    /*
-      Never erase a transaction hash or commitment ID
-      that we already know.
-    */
 
     txHash:
       incoming.txHash ||
@@ -393,11 +401,6 @@ function mergeRecoveredCommitment(
         ? undefined
         : incoming.submissionError ??
           existing.submissionError,
-
-    /*
-      Importing an older backup must not make a
-      revealed/settled record look unfinished again.
-    */
 
     revealed:
       Boolean(
@@ -606,18 +609,19 @@ export default function NtuApp() {
     PAYMENT
     ========================================================
   */
-    const [
-      previewingPayment,
-      setPreviewingPayment,
-    ] = useState(false)
 
-    const [
-      paymentPreview,
-      setPaymentPreview,
-    ] =
-      useState<PaymentPreview | null>(
-        null
-      )
+  const [
+    previewingPayment,
+    setPreviewingPayment,
+  ] = useState(false)
+
+  const [
+    paymentPreview,
+    setPaymentPreview,
+  ] =
+    useState<PaymentPreview | null>(
+      null
+    )
 
   const [
     sending,
@@ -627,12 +631,15 @@ export default function NtuApp() {
   const [
     lastPayment,
     setLastPayment,
-  ] = useState<{
-    name: string
-    amount: string
-    resolvedAddress: string
-    txHash: string
-  } | null>(null)
+  ] =
+    useState<{
+      name: string
+      amount: string
+      resolvedAddress: string
+      txHash: string
+    } | null>(
+      null
+    )
 
   /*
     ========================================================
@@ -731,22 +738,26 @@ export default function NtuApp() {
     ========================================================
   */
 
-    useEffect(() => {
-      const timeoutId =
-        window.setTimeout(() => {
+  useEffect(() => {
+    const timeoutId =
+      window.setTimeout(
+        () => {
           void refreshNetworkStatus()
           void refreshRound()
-        }, 0)
+        },
+        0
+      )
 
-      return () => {
-        window.clearTimeout(
-          timeoutId
-        )
-      }
-    }, [
-      refreshNetworkStatus,
-      refreshRound,
-    ])
+    return () => {
+      window.clearTimeout(
+        timeoutId
+      )
+    }
+  }, [
+    refreshNetworkStatus,
+    refreshRound,
+  ])
+
   /*
     ========================================================
     METAMASK EVENTS
@@ -792,17 +803,14 @@ export default function NtuApp() {
         setWithdrawalCreditEth(
           "0"
         )
-        setPaymentPreview(null)
 
+        setPaymentPreview(
+          null
+        )
       }
 
     const handleChainChanged =
       () => {
-        /*
-          Discard state that came from the previous chain.
-          Recovery records themselves remain stored.
-        */
-
         setRound(null)
         setDomain(null)
 
@@ -821,8 +829,10 @@ export default function NtuApp() {
         setLastResolutionTxHash(
           null
         )
-        setPaymentPreview(null)
 
+        setPaymentPreview(
+          null
+        )
 
         void refreshNetworkStatus()
         void refreshRound()
@@ -877,16 +887,6 @@ export default function NtuApp() {
     ========================================================
     RECONCILE AFTER RELOAD
     ========================================================
-
-    Example:
-
-    MetaMask approved
-       ↓
-    tx confirms
-       ↓
-    browser refreshes before UI updates
-       ↓
-    this checks the chain and recovers commitmentId
   */
 
   useEffect(() => {
@@ -935,9 +935,15 @@ export default function NtuApp() {
                 commitment
               )
 
-            if (cancelled ||
-                (updated.submissionStatus === commitment.submissionStatus &&
-                 updated.commitmentId === commitment.commitmentId)) {
+            if (
+              cancelled ||
+              (
+                updated.submissionStatus ===
+                  commitment.submissionStatus &&
+                updated.commitmentId ===
+                  commitment.commitmentId
+              )
+            ) {
               continue
             }
 
@@ -963,16 +969,36 @@ export default function NtuApp() {
 
     void reconcile()
 
-    const timer = commitments.some((record) =>
-      record.bidder.toLowerCase() === account.toLowerCase() &&
-      record.submissionStatus === "pending" && Boolean(record.txHash))
-      ? window.setInterval(() => { void reconcile() }, 5000)
-      : null
+    const timer =
+      commitments.some(
+        (record) =>
+          record.bidder.toLowerCase() ===
+            account.toLowerCase() &&
+          record.submissionStatus ===
+            "pending" &&
+          Boolean(
+            record.txHash
+          )
+      )
+        ? window.setInterval(
+            () => {
+              void reconcile()
+            },
+            5000
+          )
+        : null
 
     return () => {
       cancelled =
         true
-      if (timer !== null) window.clearInterval(timer)
+
+      if (
+        timer !== null
+      ) {
+        window.clearInterval(
+          timer
+        )
+      }
     }
   }, [
     account,
@@ -1131,34 +1157,34 @@ export default function NtuApp() {
       ]
     )
 
-    useEffect(() => {
-      if (
-        !account ||
-        !networkStatus?.ready
-      ) {
-        return
-      }
+  useEffect(() => {
+    if (
+      !account ||
+      !networkStatus?.ready
+    ) {
+      return
+    }
 
-      const timeoutId =
-        window.setTimeout(
-          () => {
-            void refreshWithdrawalCredit(
-              account
-            )
-          },
-          0
-        )
+    const timeoutId =
+      window.setTimeout(
+        () => {
+          void refreshWithdrawalCredit(
+            account
+          )
+        },
+        0
+      )
 
-      return () => {
-        window.clearTimeout(
-          timeoutId
-        )
-      }
-    }, [
-      account,
-      networkStatus?.ready,
-      refreshWithdrawalCredit,
-    ])
+    return () => {
+      window.clearTimeout(
+        timeoutId
+      )
+    }
+  }, [
+    account,
+    networkStatus?.ready,
+    refreshWithdrawalCredit,
+  ])
 
   /*
     ========================================================
@@ -1303,23 +1329,9 @@ export default function NtuApp() {
     ========================================================
     COMMIT
     ========================================================
-
-    Correct flow:
-
-    prepare
-       ↓
-    persist recovery record
-       ↓
-    update React
-       ↓
-    MetaMask approval
-       ↓
-    persist tx hash
-       ↓
-    wait for confirmation
   */
 
-    const handleCommit =
+  const handleCommit =
     async (
       params: {
         name: string
@@ -1352,13 +1364,6 @@ export default function NtuApp() {
         true
       )
 
-      /*
-        Always keep track of the NEWEST recovery record.
-
-        This is important because the old implementation
-        kept pointing to the original "prepared" record.
-      */
-
       let latestCommitment:
         Commitment | null =
         null
@@ -1367,10 +1372,6 @@ export default function NtuApp() {
         false
 
       try {
-        /*
-          Does not open MetaMask.
-        */
-
         const prepared =
           await prepareBidCommitment(
             params
@@ -1378,13 +1379,6 @@ export default function NtuApp() {
 
         latestCommitment =
           prepared
-
-        /*
-          CRITICAL:
-
-          Save recovery data BEFORE asking MetaMask
-          for transaction approval.
-        */
 
         persistCommitment(
           prepared
@@ -1398,19 +1392,10 @@ export default function NtuApp() {
             )
         )
 
-        /*
-          MetaMask opens here.
-        */
-
         const submission =
           await requestBidCommitment(
             prepared
           )
-
-        /*
-          A retry may discover that the commitment
-          already exists on-chain.
-        */
 
         if (
           submission.alreadyConfirmed
@@ -1450,14 +1435,6 @@ export default function NtuApp() {
           return
         }
 
-        /*
-          MetaMask approved and ethers returned a
-          transaction hash.
-
-          From this point onward, NEVER fall back to the
-          old prepared record.
-        */
-
         transactionBroadcast =
           true
 
@@ -1474,12 +1451,6 @@ export default function NtuApp() {
             submissionError:
               undefined,
           }
-
-
-        /*
-          Save txHash immediately before waiting for
-          confirmation.
-        */
 
         persistCommitment(
           pending
@@ -1506,10 +1477,6 @@ export default function NtuApp() {
 
               commitmentId:
                 confirmation.commitmentId,
-
-              /*
-                Never erase a known txHash.
-              */
 
               txHash:
                 confirmation.txHash ||
@@ -1545,19 +1512,16 @@ export default function NtuApp() {
 
           await refreshRound()
         } catch (error) {
-          /*
-            Confirmation could not be observed.
-
-            IMPORTANT:
-            preserve the pending transaction hash.
-          */
-
           const failed:
             Commitment = {
               ...pending,
 
               submissionStatus:
-                /failed on-chain|does not match|did not create/i.test(getFriendlyError(error))
+                /failed on-chain|does not match|did not create/i.test(
+                  getFriendlyError(
+                    error
+                  )
+                )
                   ? "failed"
                   : "pending",
 
@@ -1586,15 +1550,6 @@ export default function NtuApp() {
           getFriendlyError(
             error
           )
-
-        /*
-          Only classify the record here when a transaction
-          was NOT already broadcast.
-
-          If it was broadcast, the pending/failed record
-          above is already the newest version and must not
-          be overwritten with "prepared".
-        */
 
         if (
           latestCommitment &&
@@ -1691,6 +1646,30 @@ export default function NtuApp() {
       )
 
       try {
+        /*
+          Fresh contract state check before MetaMask.
+        */
+
+        const latestRound =
+          await getCurrentRoundState()
+
+        if (
+          !latestRound ||
+          latestRound.roundId !==
+            commitment.roundId ||
+          latestRound.phase !==
+            "reveal"
+        ) {
+          throw new Error(
+            "This commitment is not currently in the reveal phase. Refresh the auction state and try again."
+          )
+        }
+
+        /*
+          revealBid performs another on-chain
+          phase check before sending the transaction.
+        */
+
         const result =
           await revealBid(
             commitment
@@ -1719,6 +1698,11 @@ export default function NtuApp() {
             )
         )
 
+        /*
+          First valid reveal reserves the domain.
+          Later reveals update the highest bidder.
+        */
+
         setDomain(
           await checkDomain(
             commitment.name
@@ -1727,6 +1711,16 @@ export default function NtuApp() {
 
         await refreshRound()
       } catch (error) {
+        /*
+          If the chain phase changed,
+          immediately refresh stale UI state.
+        */
+
+        await Promise.all([
+          refreshRound(),
+          refreshCurrentDomain(),
+        ])
+
         alert(
           getFriendlyError(
             error
@@ -1780,6 +1774,11 @@ export default function NtuApp() {
 
         await refreshRound()
       } catch (error) {
+        await Promise.all([
+          refreshRound(),
+          refreshCurrentDomain(),
+        ])
+
         alert(
           getFriendlyError(
             error
@@ -2022,38 +2021,30 @@ export default function NtuApp() {
     ========================================================
   */
 
-    const handleDownloadBackup =
+  const handleDownloadBackup =
     async () => {
       if (!account) {
         alert(
           "Connect the wallet whose commitments you want to back up."
         )
-  
+
         return
       }
-  
-      if (!networkStatus?.ready) {
+
+      if (
+        !networkStatus?.ready
+      ) {
         alert(
           "Connect to the configured registrar network before exporting a backup."
         )
-  
+
         return
       }
-  
+
       const registrarAddress =
         getRegistrarAddress()
           .toLowerCase()
-  
-      /*
-        Only export commitments that belong to:
-        - the currently connected wallet
-        - the current chain
-        - the current registrar deployment
-  
-        This prevents one backup file from accidentally
-        containing bids belonging to multiple wallets.
-      */
-  
+
       const exportable =
         commitments.filter(
           (commitment) =>
@@ -2066,7 +2057,7 @@ export default function NtuApp() {
               .toLowerCase() ===
               account.toLowerCase()
         )
-  
+
       if (
         exportable.length ===
         0
@@ -2074,10 +2065,10 @@ export default function NtuApp() {
         alert(
           "No commitments were found for this wallet on the current registrar."
         )
-  
+
         return
       }
-  
+
       try {
         const backups =
           await Promise.all(
@@ -2088,7 +2079,7 @@ export default function NtuApp() {
                 )
             )
           )
-  
+
         const blob =
           new Blob(
             [
@@ -2103,36 +2094,36 @@ export default function NtuApp() {
                 "application/json",
             }
           )
-  
+
         const url =
           URL.createObjectURL(
             blob
           )
-  
+
         const anchor =
           document.createElement(
             "a"
           )
-  
+
         anchor.href =
           url
-  
+
         anchor.download =
           `ntu-reveal-backup-v1-${account.slice(
             0,
             6
           )}-${networkStatus.chainId}.json`
-  
+
         document.body.appendChild(
           anchor
         )
-  
+
         anchor.click()
-  
+
         document.body.removeChild(
           anchor
         )
-  
+
         URL.revokeObjectURL(
           url
         )
@@ -2151,142 +2142,119 @@ export default function NtuApp() {
     ========================================================
   */
 
-const handleImportBackup =
-  async (
-    file: File
-  ) => {
-    if (!account) {
-      alert(
-        "Connect the wallet that created the commitment before importing a backup."
-      )
-
-      return
-    }
-
-    try {
-      const parsed =
-        JSON.parse(
-          await file.text()
+  const handleImportBackup =
+    async (
+      file: File
+    ) => {
+      if (!account) {
+        alert(
+          "Connect the wallet that created the commitment before importing a backup."
         )
 
-      const records =
-        Array.isArray(
-          parsed
-        )
-          ? parsed
-          : [parsed]
-
-      const verified:
-        Commitment[] = []
-
-      /*
-        First verify EVERY incoming backup.
-
-        Nothing is written to localStorage until all
-        backups have passed.
-      */
-
-      for (
-        const raw of records
-      ) {
-        const backup =
-          parseRevealBackup(
-            raw
-          )
-
-        const verification =
-          await verifyRevealBackup(
-            backup,
-            account
-          )
-
-        verified.push(
-          backupToCommitment(
-            backup,
-            verification
-          )
-        )
+        return
       }
 
-      /*
-        Merge into a temporary copy first.
-
-        This means a conflict cannot partially overwrite
-        valid recovery data.
-      */
-
-      let mergedRecords =
-        [...commitments]
-
-      const recordsToPersist:
-        Commitment[] = []
-
-      for (
-        const incoming of
-        verified
-      ) {
-        const existing =
-          mergedRecords.find(
-            (record) =>
-              sameCommitmentContext(
-                record,
-                incoming
-              )
+      try {
+        const parsed =
+          JSON.parse(
+            await file.text()
           )
 
-        const merged =
-          existing
-            ? mergeRecoveredCommitment(
-                existing,
-                incoming
-              )
-            : incoming
+        const records =
+          Array.isArray(
+            parsed
+          )
+            ? parsed
+            : [parsed]
 
-        mergedRecords =
-          upsertCommitment(
-            mergedRecords,
+        const verified:
+          Commitment[] = []
+
+        for (
+          const raw of
+          records
+        ) {
+          const backup =
+            parseRevealBackup(
+              raw
+            )
+
+          const verification =
+            await verifyRevealBackup(
+              backup,
+              account
+            )
+
+          verified.push(
+            backupToCommitment(
+              backup,
+              verification
+            )
+          )
+        }
+
+        let mergedRecords =
+          [...commitments]
+
+        const recordsToPersist:
+          Commitment[] = []
+
+        for (
+          const incoming of
+          verified
+        ) {
+          const existing =
+            mergedRecords.find(
+              (record) =>
+                sameCommitmentContext(
+                  record,
+                  incoming
+                )
+            )
+
+          const merged =
+            existing
+              ? mergeRecoveredCommitment(
+                  existing,
+                  incoming
+                )
+              : incoming
+
+          mergedRecords =
+            upsertCommitment(
+              mergedRecords,
+              merged
+            )
+
+          recordsToPersist.push(
             merged
           )
+        }
 
-        recordsToPersist.push(
-          merged
+        for (
+          const commitment of
+          recordsToPersist
+        ) {
+          persistCommitment(
+            commitment
+          )
+        }
+
+        setCommitments(
+          mergedRecords
+        )
+
+        alert(
+          "Reveal backup verified and imported successfully."
+        )
+      } catch (error) {
+        alert(
+          getFriendlyError(
+            error
+          )
         )
       }
-
-      /*
-        All validation and conflict checks succeeded.
-
-        Only now mutate storage.
-      */
-
-      for (
-        const commitment of
-        recordsToPersist
-      ) {
-        persistCommitment(
-          commitment
-        )
-      }
-
-      setCommitments(
-        mergedRecords
-      )
-
-      alert(
-        "Reveal backup verified and imported successfully."
-      )
-    } catch (error) {
-      /*
-        Nothing has been written if validation failed.
-      */
-
-      alert(
-        getFriendlyError(
-          error
-        )
-      )
     }
-  }
 
   /*
     ========================================================
@@ -2295,159 +2263,144 @@ const handleImportBackup =
   */
 
   const handlePaymentPreview =
-  async (
-    params: {
-      name: string
-      amount: string
-    }
-  ) => {
-    if (!account) {
-      alert(
-        "Connect your wallet before sending ETH."
-      )
-
-      return
-    }
-
-    if (
-      !networkStatus?.ready
-    ) {
-      alert(
-        `Switch to ${
-          networkStatus?.expectedNetworkName ??
-          "the configured network"
-        } before sending ETH.`
-      )
-
-      return
-    }
-
-    setPreviewingPayment(
-      true
-    )
-
-    /*
-      Creating a new preview invalidates any old one.
-    */
-
-    setPaymentPreview(
-      null
-    )
-
-    try {
-      const result =
-        await previewPayment(
-          params
+    async (
+      params: {
+        name: string
+        amount: string
+      }
+    ) => {
+      if (!account) {
+        alert(
+          "Connect your wallet before sending ETH."
         )
 
-      setPaymentPreview(
-        result
-      )
-    } catch (error) {
-      alert(
-        getFriendlyError(
-          error
+        return
+      }
+
+      if (
+        !networkStatus?.ready
+      ) {
+        alert(
+          `Switch to ${
+            networkStatus?.expectedNetworkName ??
+            "the configured network"
+          } before sending ETH.`
         )
-      )
-    } finally {
+
+        return
+      }
+
       setPreviewingPayment(
-        false
-      )
-    }
-  }
-
-const handleConfirmPayment =
-  async (
-    preview:
-      PaymentPreview
-  ) => {
-    if (!account) {
-      alert(
-        "Connect your wallet before sending ETH."
+        true
       )
 
-      return
-    }
-
-    if (
-      !networkStatus?.ready
-    ) {
       setPaymentPreview(
         null
       )
 
-      alert(
-        "The network changed. Please preview the payment again."
-      )
+      try {
+        const result =
+          await previewPayment(
+            params
+          )
 
-      return
+        setPaymentPreview(
+          result
+        )
+      } catch (error) {
+        alert(
+          getFriendlyError(
+            error
+          )
+        )
+      } finally {
+        setPreviewingPayment(
+          false
+        )
+      }
     }
 
-    setSending(
-      true
-    )
-
-    try {
-      const result =
-        await confirmPayment(
-          preview
+  const handleConfirmPayment =
+    async (
+      preview:
+        PaymentPreview
+    ) => {
+      if (!account) {
+        alert(
+          "Connect your wallet before sending ETH."
         )
 
-      setLastPayment({
-        name:
-          preview.name,
+        return
+      }
 
-        amount:
-          preview.amount,
-
-        resolvedAddress:
-          result.resolvedAddress,
-
-        txHash:
-          result.txHash,
-      })
-
-      /*
-        A successful payment consumes the preview.
-      */
-
-      setPaymentPreview(
-        null
-      )
-    } catch (error) {
-      /*
-        Important:
-        any failed confirmation requires a fresh preview.
-
-        This covers stale recipient/network.
-      */
-
-      setPaymentPreview(
-        null
-      )
-
-      alert(
-        getFriendlyError(
-          error
+      if (
+        !networkStatus?.ready
+      ) {
+        setPaymentPreview(
+          null
         )
-      )
-    } finally {
+
+        alert(
+          "The network changed. Please preview the payment again."
+        )
+
+        return
+      }
+
       setSending(
-        false
+        true
+      )
+
+      try {
+        const result =
+          await confirmPayment(
+            preview
+          )
+
+        setLastPayment({
+          name:
+            preview.name,
+
+          amount:
+            preview.amount,
+
+          resolvedAddress:
+            result.resolvedAddress,
+
+          txHash:
+            result.txHash,
+        })
+
+        setPaymentPreview(
+          null
+        )
+      } catch (error) {
+        setPaymentPreview(
+          null
+        )
+
+        alert(
+          getFriendlyError(
+            error
+          )
+        )
+      } finally {
+        setSending(
+          false
+        )
+      }
+    }
+
+  const handleClearPaymentPreview =
+    () => {
+      if (sending) {
+        return
+      }
+
+      setPaymentPreview(
+        null
       )
     }
-  }
-
-const handleClearPaymentPreview =
-  () => {
-    if (sending) {
-      return
-    }
-
-    setPaymentPreview(
-      null
-    )
-  }
 
   /*
     ========================================================
@@ -2649,7 +2602,6 @@ const handleClearPaymentPreview =
             commitments={
               commitments
             }
-            domain={domain}
             round={round}
             account={
               writeAccount
@@ -2721,30 +2673,32 @@ const handleClearPaymentPreview =
           }
         />
 
-<PaymentSection
-  account={writeAccount}
-  previewing={
-    previewingPayment
-  }
-  sending={
-    sending
-  }
-  preview={
-    paymentPreview
-  }
-  lastPayment={
-    lastPayment
-  }
-  onPreview={
-    handlePaymentPreview
-  }
-  onConfirm={
-    handleConfirmPayment
-  }
-  onClearPreview={
-    handleClearPaymentPreview
-  }
-/>
+        <PaymentSection
+          account={
+            writeAccount
+          }
+          previewing={
+            previewingPayment
+          }
+          sending={
+            sending
+          }
+          preview={
+            paymentPreview
+          }
+          lastPayment={
+            lastPayment
+          }
+          onPreview={
+            handlePaymentPreview
+          }
+          onConfirm={
+            handleConfirmPayment
+          }
+          onClearPreview={
+            handleClearPaymentPreview
+          }
+        />
       </main>
 
       <footer className="border-t border-zinc-200 py-6 text-center text-xs text-zinc-500">

@@ -6,8 +6,6 @@ import {
   Upload,
 } from "lucide-react"
 
-import { useEffect, useState } from "react"
-
 import {
   Button,
   Card,
@@ -15,16 +13,13 @@ import {
 } from "./primitives"
 
 import {
-  phaseRemainingMs,
   shortenHex,
   type Commitment,
-  type DomainInfo,
   type RoundState,
 } from "./handlers"
 
 export function RevealSection({
   commitments,
-  domain,
   round,
   account,
   revealingHash,
@@ -33,7 +28,6 @@ export function RevealSection({
   onImportBackup,
 }: {
   commitments: Commitment[]
-  domain: DomainInfo | null
   round: RoundState | null
   account: string | null
   revealingHash: string | null
@@ -41,13 +35,6 @@ export function RevealSection({
   onDownloadBackup: () => void
   onImportBackup: (file: File) => void
 }) {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    if (!domain?.phaseEndsAt) return
-    const timer = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(timer)
-  }, [domain?.phaseEndsAt])
-
   return (
     <Card
       title="Reveal bids"
@@ -114,14 +101,21 @@ export function RevealSection({
               c.bidder.toLowerCase() ===
                 account.toLowerCase()
 
-                const inReveal =
-                round?.phase === "reveal" &&
-                round.roundId === c.roundId &&
-                phaseRemainingMs(
-                  round.phaseEndsAt,
-                  round.chainClock,
-                  now
-                ) > 0
+            /*
+              The contract's round phase is authoritative.
+
+              Do NOT require the domain to already be
+              reserved. The first valid reveal is what
+              creates that reservation.
+            */
+
+            const correctRound =
+              !!round &&
+              round.roundId === c.roundId
+
+            const inReveal =
+              correctRound &&
+              round.phase === "reveal"
 
             return (
               <li
@@ -138,13 +132,16 @@ export function RevealSection({
 
                   <CommitmentBadge
                     revealed={c.revealed}
-                    settled={
-                      !!c.settled
+                    settled={!!c.settled}
+                    submissionStatus={
+                      c.submissionStatus ??
+                      (c.commitmentId
+                        ? "confirmed"
+                        : c.txHash
+                          ? "pending"
+                          : "prepared")
                     }
-                    submissionStatus={c.submissionStatus ?? (c.commitmentId ? "confirmed" : c.txHash ? "pending" : "prepared")}
-                    valid={
-                      c.valid
-                    }
+                    valid={c.valid}
                     ready={
                       inReveal &&
                       correctWallet
@@ -179,8 +176,7 @@ export function RevealSection({
                   </dt>
 
                   <dd className="text-right font-mono text-zinc-800">
-                    {c.roundId ??
-                      "—"}
+                    {c.roundId ?? "—"}
                   </dd>
 
                   <dt className="text-zinc-500">
@@ -242,7 +238,8 @@ export function RevealSection({
                         !inReveal ||
                         !correctWallet ||
                         !c.commitmentId ||
-                        c.submissionStatus === "failed"
+                        c.submissionStatus ===
+                          "failed"
                       }
                       loading={
                         revealingHash ===
@@ -252,27 +249,28 @@ export function RevealSection({
                         onReveal(c)
                       }
                     >
-                      {c.submissionStatus === "failed"
+                      {c.submissionStatus ===
+                      "failed"
                         ? "Commit failed; no on-chain bid"
-                        : c.submissionStatus === "rejected"
+                        : c.submissionStatus ===
+                            "rejected"
                           ? "Commit request rejected"
-                        : !account
-                        ? "Connect wallet to reveal"
-                        : !correctWallet
-                          ? "Switch to original wallet"
-                        : !c.commitmentId
-                            ? c.txHash ? "Checking chain confirmation" : "Not submitted; commit during a round"
-                            : round?.phase === "reveal" &&
-                            round.roundId === c.roundId &&
-                            phaseRemainingMs(
-                              round.phaseEndsAt,
-                              round.chainClock,
-                              now
-                            ) === 0
-                            ? "Reveal window elapsed; refresh"
-                          : inReveal
-                            ? "Reveal bid"
-                            : "Available in reveal phase"}
+                          : !account
+                            ? "Connect wallet to reveal"
+                            : !correctWallet
+                              ? "Switch to original wallet"
+                              : !c.commitmentId
+                                ? c.txHash
+                                  ? "Checking chain confirmation"
+                                  : "Not submitted; commit during a round"
+                                : !correctRound
+                                  ? "Not active in current round"
+                                  : round.phase ===
+                                      "ended"
+                                    ? "Reveal window ended"
+                                    : inReveal
+                                      ? "Reveal bid"
+                                      : "Available in reveal phase"}
                     </Button>
                   )}
               </li>
@@ -304,19 +302,35 @@ function CommitmentBadge({
   ready: boolean
 }) {
   if (submissionStatus === "failed") {
-    return <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs text-red-800">Commit failed</span>
+    return (
+      <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs text-red-800">
+        Commit failed
+      </span>
+    )
   }
 
   if (submissionStatus === "rejected") {
-    return <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs text-amber-800">Commit request rejected</span>
+    return (
+      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs text-amber-800">
+        Commit request rejected
+      </span>
+    )
   }
 
   if (submissionStatus === "prepared") {
-    return <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs text-amber-800">Prepared, not submitted</span>
+    return (
+      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs text-amber-800">
+        Prepared, not submitted
+      </span>
+    )
   }
 
   if (submissionStatus === "pending") {
-    return <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs text-blue-800">Submitted, checking chain</span>
+    return (
+      <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs text-blue-800">
+        Submitted, checking chain
+      </span>
+    )
   }
 
   if (settled) {
