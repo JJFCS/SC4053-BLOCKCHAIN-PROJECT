@@ -19,11 +19,13 @@ import {
   shortenHex,
   type Commitment,
   type DomainInfo,
+  type RoundState,
 } from "./handlers"
 
 export function RevealSection({
   commitments,
   domain,
+  round,
   account,
   revealingHash,
   onReveal,
@@ -32,6 +34,7 @@ export function RevealSection({
 }: {
   commitments: Commitment[]
   domain: DomainInfo | null
+  round: RoundState | null
   account: string | null
   revealingHash: string | null
   onReveal: (commitment: Commitment) => void
@@ -111,10 +114,14 @@ export function RevealSection({
               c.bidder.toLowerCase() ===
                 account.toLowerCase()
 
-            const inReveal =
-              domain?.name === c.name &&
-              domain.status === "reveal" &&
-              phaseRemainingMs(domain.phaseEndsAt, domain.chainClock, now) > 0
+                const inReveal =
+                round?.phase === "reveal" &&
+                round.roundId === c.roundId &&
+                phaseRemainingMs(
+                  round.phaseEndsAt,
+                  round.chainClock,
+                  now
+                ) > 0
 
             return (
               <li
@@ -255,8 +262,13 @@ export function RevealSection({
                           ? "Switch to original wallet"
                         : !c.commitmentId
                             ? c.txHash ? "Checking chain confirmation" : "Not submitted; commit during a round"
-                          : domain?.name === c.name && domain.status === "reveal" &&
-                            phaseRemainingMs(domain.phaseEndsAt, domain.chainClock, now) === 0
+                            : round?.phase === "reveal" &&
+                            round.roundId === c.roundId &&
+                            phaseRemainingMs(
+                              round.phaseEndsAt,
+                              round.chainClock,
+                              now
+                            ) === 0
                             ? "Reveal window elapsed; refresh"
                           : inReveal
                             ? "Reveal bid"

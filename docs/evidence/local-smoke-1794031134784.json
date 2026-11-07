@@ -1,0 +1,53 @@
+{
+  "status": "passed",
+  "environment": "local Hardhat JSON-RPC; test funds; no browser wallet exercised",
+  "recordedAt": "2026-11-07T05:58:54.784Z",
+  "deployment": {
+    "schemaVersion": 1,
+    "recordedAt": "2026-11-07T05:58:27.128Z",
+    "network": "localhost",
+    "chainId": "31337",
+    "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "treasury": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "transactionHash": "0x52058ff4dd59f1e0cbd8cff3587eae043555882723333ad11d68de59f2634b91",
+    "blockNumber": 1,
+    "sourceBaseRevision": "cb1f3c4b5bbc04326804089d30991dc69c6a2f60",
+    "gitRevision": "4b0b04bfe5d1ee7901f697e485885a4f36e99189",
+    "workingTreeDirty": false,
+    "sourceSha256": "eda56c304c579d9c167550521279008830b4528169042442da05a94c9edabf89",
+    "abiSha256": "914bbe560661b99269ab569b1f860266b65b9a28cdb1592ff1070bef71350f2f",
+    "runtimeCodeHash": "0xceabb441333da21cb56aae0cbb094b373e85834f200d8730727ee9feb2df066d",
+    "creationDataHash": "0xf0b4cc969649152e35738e09013c20c2d74f428aadf091b9da15d8d30b93cafc",
+    "initialRoundId": "0",
+    "compilerReplay": {
+      "version": "0.8.34",
+      "sourceLineEnding": "LF"
+    }
+  },
+  "label": "c-smoke",
+  "winningBidWei": "30000000000000001",
+  "paymentWei": "1000000000000001",
+  "staleRecipient": "rejected by static call; then freshly confirmed recipient paid",
+  "lockedDepositAfterOlderWithdrawals": "100000000000000000",
+  "transactions": {
+    "startRound1": "0x39e43e5c4ec2f8968443b83389def627abcb6d179920996f6788ecdd8a0f12a3",
+    "commit1": "0x6895f7878ceede2d20fb3304f4b166339a0932cdbff3245fa0ab59554714674b",
+    "commit2": "0x02cf73ed1bf5172c2957939fe08c3902adc2e5402d4d34440bb71e4f3d542851",
+    "commit3": "0x1cf11e750da4f563ed9b9cb9af2f79c698a957286b004154360e6bd5f51f1d55",
+    "revealLoser": "0x4640e353a3d0817854b6f69cc61a0288bf48677ef4380c9c0820178d43d7734b",
+    "revealWinner": "0xf3ba24275025c8f3a147ee6af75afc5b093ec3202cfa197274f3371ee8880a19",
+    "startRound2BeforeOldFinalization": "0x1a188d115f88b509ee45e0dced215f1e95fec1b039445f2c5d07a7ab3378ff53",
+    "commitRound2": "0x00f618ebbf159044d2a7bef3289fe2db5a915e9d25f9125bc26c127b8507ae93",
+    "finalizeOldRound": "0x904239d00850ca87a2aa7781515b7b6499d35d7fc5081610cec8b134acd8ce05",
+    "settle-winner": "0x12f331954781b56d6d624574c0dd57715bc20156e65c812727ca7b3700d16440",
+    "settle-loser": "0xe18edec16849deabf66de2a24b89601b2474c59b379a4c76209b89e502510380",
+    "settle-unrevealed": "0x6297091819fcd750ab4f5eacc2f68c4f784215921230e37a7855ada8659c5a51",
+    "withdraw-winner": "0xc854f33eb84d52c265f602ffe5bf76c85c6a3caf669fce7e2f619a4ce0f2f76d",
+    "withdraw-loser": "0x2b9b886ad6186a2d47a0e1f82dfa31d2343275fa76e100fa9b81ac99599803f3",
+    "withdraw-unrevealed": "0x247fd0685726947356fa17fd90cec73e0688300275b186dc18b00b78f2ed060d",
+    "withdraw-treasury": "0x04ecac8c0cfd91e163e5ad6df34c59dfae302ed1e1673be7c0c43d4e94b3d39c",
+    "setAddress": "0xacd9c7920845384e37b4e8796cf69c3699a34c4403db60956542bda16b78027e",
+    "checkedDomainPayment": "0xf442f6b41572b00371b9524b23114891f89df6f2f330f7a581b9c4fc63ad5485"
+  }
+}
