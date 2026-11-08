@@ -45,7 +45,7 @@ are identified in BROWSER_ACCEPTANCE.md.
 | Search, bid/reveal UI and ETH payments by name | Current frontend implements the main screens; handler tests and local browser checks verified the key flows. Findings are recorded in `FRONTEND_FINDINGS.md`. |
 | Short test phases and non-reveal policy | 120/120 seconds and 0.001 ETH penalty implemented and exercised. |
 | Specification and validation tooling | Specification and validation workflow documented; available AI workflow evidence is described in the audit report. |
-| Eight-section AI Audit Report and major-issue evidence | The submission PDF and matching Markdown report cover the eight sections and cite the dated tests and browser observations. |
+| Eight-section AI Audit Report and major-issue evidence | The submission PDF covers the eight sections and cites the dated tests and browser observations. |
 | Complete reproducible code ZIP and README | Clean local command-line setup passed on final code revision; assemble the final code package for submission. |
 | Demo video at most 10 minutes, architecture and deployed demonstration | The team recorded the video separately; include the final video file or URL with the submission. |
 | Individual peer evaluation | Each member must complete the course process. |
