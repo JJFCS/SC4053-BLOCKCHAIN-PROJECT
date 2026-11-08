@@ -115,7 +115,7 @@ interfaces. `contracts/deployments/` holds generated deployment records.
 - `docs/VALIDATION.md`, `docs/BROWSER_ACCEPTANCE.md`, and
   `docs/REQUIREMENTS_COVERAGE.md`: observed validation and coverage.
 - `docs/FRONTEND_FINDINGS.md`: frontend findings, corrections and results.
-- `docs/AI_AUDIT_REPORT.md`: development and audit account.
+- `docs/AI_AUDIT_REPORT.pdf`: submission audit report.
 
 The documents identify which conclusions come from contract tests and which
 come from local browser observations.

@@ -271,8 +271,9 @@ migration was included in `e63143b`.
 
 ## Final release checks
 
-- Assemble the final code package and demo video. Code PR #12 and documentation
-  PR #13 are merged into main as `cc7e309` and `4006260`, respectively. The
+- Assemble the final code package; the team recorded the demo video separately.
+  Code PR #12 and documentation PR #13 are merged into main as `cc7e309` and
+  `4006260`, respectively. The
   local final-revision frontend matched its deployed ABI, address and chain.
   Public Sepolia browser behaviour was not checked here.
 - Retain the documented development-tool advisory finding unless a compatible
